@@ -1,0 +1,45 @@
+name: zalo-platform
+label: Zalo
+kind: platform
+version: 1.0.0
+description: >
+  Zalo gateway adapter for Hermes Agent.
+  Connects a personal Zalo account (via zca-js, an unofficial reverse-engineered
+  client) to Hermes through a local Node.js bridge over an HTTP API, so the bot
+  can join group chats as a normal member and always answer in DMs.
+  Groups are mention-gated by default; DMs always respond.
+author: NousResearch
+requires_env:
+  - name: ZALO_ENABLED
+    description: "Enable the Zalo adapter (requires pairing via `hermes zalo setup` and the Node.js bridge running)"
+    prompt: "Enable Zalo? (true/false)"
+    password: false
+optional_env:
+  - name: ZALO_ALLOWED_USERS
+    description: "Comma-separated Zalo user IDs allowed to talk to the bot"
+    prompt: "Allowed users (comma-separated)"
+    password: false
+  - name: ZALO_ALLOW_ALL_USERS
+    description: "Allow any Zalo user to trigger the bot (dev only)"
+    prompt: "Allow all users? (true/false)"
+    password: false
+  - name: ZALO_HOME_CHANNEL
+    description: "Default chat ID (e.g. u:123... or g:456...) for cron / notification delivery"
+    prompt: "Home channel ID"
+    password: false
+  - name: ZALO_REQUIRE_MENTION
+    description: "Require an @mention of the bot before it responds in groups (DMs always respond)"
+    prompt: "Require @mention in groups? (true/false)"
+    password: false
+  - name: ZALO_MENTION_NAME
+    description: "Bot display name used as a text-match fallback for group mention gating"
+    prompt: "Bot display name (for mention fallback matching)"
+    password: false
+  - name: ZALO_FREE_RESPONSE_CHATS
+    description: "Comma-separated group chat IDs that bypass mention-gating and always respond"
+    prompt: "Free-response group chat IDs (comma-separated)"
+    password: false
+  - name: ZALO_BRIDGE_PORT
+    description: "Local HTTP port for the Zalo Node.js bridge (default 3050)"
+    prompt: "Bridge port"
+    password: false
