@@ -23,7 +23,26 @@ from hermes_constants import get_hermes_home
 
 logger = logging.getLogger(__name__)
 
-MUSEAI_DIR = Path("/Users/trieuhoang/Documents/Projects/3TB/MuseAI")
+def get_museai_dir() -> Path:
+    """Dynamically resolve MuseAI project directory across Windows/macOS/Linux."""
+    env_dir = os.environ.get("MUSEAI_DIR")
+    if env_dir and os.path.isdir(env_dir):
+        return Path(env_dir)
+    cfg_file = get_hermes_home() / "virtual_office_config.json"
+    if cfg_file.exists():
+        try:
+            with open(cfg_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                custom = data.get("museai_dir")
+                if custom and os.path.isdir(custom):
+                    return Path(custom)
+        except Exception:
+            pass
+    # Sibling folder relative to repo root
+    sibling = Path(__file__).resolve().parent.parent.parent / "MuseAI"
+    if sibling.is_dir():
+        return sibling
+    return Path("/Users/trieuhoang/Documents/Projects/3TB/MuseAI")
 
 
 @dataclass
@@ -352,7 +371,7 @@ def get_gologin_and_cookies_status() -> Dict[str, Any]:
         os.path.expanduser("~/.npm-global/bin/gologin-agent-browser")
     )
 
-    cookies_dir = MUSEAI_DIR / "cookies"
+    cookies_dir = get_museai_dir() / "cookies"
     cookies_found = []
     if cookies_dir.is_dir():
         for f in cookies_dir.glob("*.json"):
