@@ -48,6 +48,8 @@ _HERMES_CORE_TOOLS = [
     "bfl_flux3_text_to_video", "bfl_flux3_image_to_video",
     "bfl_flux3_keyframes_to_video", "bfl_flux3_video_continuation",
     "bfl_flux3_get_result", "bfl_flux3_prompting_guide",
+    # Muse AI media generation (images & video)
+    "muse_generate_media", "muse_check_status",
     # Skills
     "skills_list", "skill_view", "skill_manage",
     # Browser automation
@@ -158,6 +160,15 @@ TOOLSETS = {
             "``hermes tools`` → Video Generation."
         ),
         "tools": ["video_generate", "xai_video_edit", "xai_video_extend"],
+        "includes": []
+    },
+
+    "muse": {
+        "description": (
+            "Muse AI media generation tools (image and video generation via "
+            "Muse headless RPC server at :8770 with automated cookie support)."
+        ),
+        "tools": ["muse_generate_media", "muse_check_status"],
         "includes": []
     },
 

@@ -1203,7 +1203,10 @@ def register(ctx) -> None:
             "MEDIA:/absolute/path/to/file in your response; images and other "
             "files are delivered as native Zalo attachments. Inbound media from "
             "the user arrives only as a description, not a file — you cannot "
-            "read or view attachments the user sends."
+            "read or view attachments the user sends. "
+            "When users on Zalo ask to create, draw, or generate images or videos (TVC, clips, motion), "
+            "use the `muse_generate_media` tool (media_type='video' or 'image'). It will generate the media "
+            "and output the MEDIA: path to send directly to the user."
         ),
     )
 
