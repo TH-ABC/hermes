@@ -77,6 +77,26 @@ def _builtin_gateway_liveness() -> Optional[bool]:
     try:
         if _active_cron_provider_name() != "builtin":
             return True  # external provider fires jobs without the gateway
+
+        # Fast, unambiguous path: a cron/cronjob tool call only ever executes
+        # inside the live gateway process itself (there is no other caller).
+        # If this process's own PID matches the recorded gateway PID file,
+        # we ARE the running gateway — skip the lock-file probe below, whose
+        # Windows implementation (msvcrt region locking re-acquired via a
+        # second file handle in the *same* process) has been observed to
+        # report "not active" as a false negative even while the gateway is
+        # demonstrably alive and firing jobs on schedule.
+        try:
+            import os
+
+            from gateway.status import _get_pid_path, _pid_from_record, _read_pid_record
+
+            record = _read_pid_record(_get_pid_path())
+            if _pid_from_record(record) == os.getpid():
+                return True
+        except Exception:
+            pass
+
         from hermes_cli.gateway import find_gateway_pids
 
         return bool(find_gateway_pids())

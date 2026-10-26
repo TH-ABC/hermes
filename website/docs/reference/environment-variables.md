@@ -625,15 +625,18 @@ Used by the bundled LINE platform plugin (`plugins/platforms/line/`). See [Messa
 
 Used by the bundled Zalo platform plugin (`plugins/platforms/zalo/`), which connects a personal Zalo account through a local Node.js bridge built on the unofficial `zca-js` client. See [Messaging Gateway → Zalo](/user-guide/messaging/zalo) for full setup.
 
+Access control (who may DM the bot, and which groups it responds in) is **not** configured via env vars — it lives under `platforms.zalo.extra` in `config.yaml` (`owner_id`, `group_allow_from`, `groups`) and via the in-chat `!moquyenchat`/`!dongquyenchat` commands. See [Zalo → Access Control & Chat Permission Commands](/user-guide/messaging/zalo#access-control--chat-permission-commands).
+
 | Variable | Description |
 |----------|-------------|
 | `ZALO_ENABLED` | Enable the Zalo adapter (requires pairing via `hermes zalo setup` and the Node.js bridge running). Required. |
-| `ZALO_ALLOWED_USERS` | Comma-separated Zalo user IDs allowed to talk to the bot. |
-| `ZALO_ALLOW_ALL_USERS` | Allow any Zalo user to trigger the bot (dev only). |
+| `ZALO_ALLOWED_USERS` | Legacy escape hatch — setting this disables Zalo's own owner/group access policy and falls back to this flat, platform-wide allowlist for every Zalo chat. Leave unset. |
+| `ZALO_ALLOW_ALL_USERS` | Legacy escape hatch — allow any Zalo user platform-wide, bypassing the owner/group policy entirely. Leave unset. |
 | `ZALO_HOME_CHANNEL` | Default chat ID (e.g. `u:123...` or `g:456...`) for cron / notification delivery. |
-| `ZALO_REQUIRE_MENTION` | Require an @mention of the bot before it responds in groups; DMs always respond (default: `true`). |
+| `ZALO_REQUIRE_MENTION` | Require an @mention of the bot before it responds in groups; DMs never need a mention (default: `true`). |
 | `ZALO_MENTION_NAME` | Bot display name used as a text-match fallback for group mention gating. |
 | `ZALO_FREE_RESPONSE_CHATS` | Comma-separated group chat IDs that bypass mention-gating and always respond. |
+| `ZALO_DISABLE_DMS` | Block direct messages entirely, including from the configured owner. |
 | `ZALO_BRIDGE_PORT` | Local HTTP port for the Zalo Node.js bridge (default `3050`). |
 
 ### ntfy (push notifications)

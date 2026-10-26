@@ -185,6 +185,8 @@ def _plugin_session_info(agent: Any) -> Dict[str, str]:
         "platform": str(getattr(agent, "platform", None) or ""),
         "profile_name": profile_name,
         "cwd": cwd,
+        "chat_id": str(getattr(agent, "chat_id", None) or ""),
+        "chat_type": str(getattr(agent, "chat_type", None) or ""),
     }
 
 

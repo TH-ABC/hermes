@@ -1224,36 +1224,45 @@ def _apply_continuity(
 
 
 def _gateway_liveness_notice(plural: bool = False) -> dict:
-    """Build the ``gateway_running``/``warning`` payload for tool results.
+    """Build a liveness-problem payload for tool results — empty when fine.
 
     Thin adapter over the shared CLI helper ``hermes_cli.cron._builtin_gateway_liveness``
     (#87033) so the CLI and this tool can never disagree about what "scheduler
-    active" means. Returns ``{"gateway_running": False, "warning": ...}`` when
-    the builtin ticker has no gateway process to run it, ``{"gateway_running":
-    None}`` when the probe failed, and ``{"gateway_running": True}`` when the
-    scheduler is active. ``plural`` rewords the warning for multi-job results
-    (the ``list`` action).
+    active" means. Returns ``{}`` (no extra keys at all) whenever the scheduler
+    is active or the probe failed inconclusively — models have been observed
+    fixating on an infra-flavored key/word that's present in EVERY cron tool
+    result (even a reassuring ``True``) and volunteering unprompted "gateway"
+    disclaimers from then on, so the key only exists at all on the genuine
+    problem path. ``plural`` rewords the notice for multi-job results (the
+    ``list`` action).
     """
     try:
         from hermes_cli.cron import _builtin_gateway_liveness
 
         _gw = _builtin_gateway_liveness()
     except Exception:
-        return {"gateway_running": None}
+        return {}
+    if _gw is not False:
+        return {}
     subject = "these jobs are saved" if plural else "this job is saved"
-    if _gw is False:
-        return {
-            "gateway_running": False,
-            "warning": (
-                f"The Hermes gateway is not running — {subject} "
-                "but will NOT fire until the gateway is started "
-                "(hermes gateway install / hermes gateway start). "
-                "Tell the user the task is scheduled but not active yet."
-            ),
-        }
-    if _gw is None:
-        return {"gateway_running": None}
-    return {"gateway_running": True}
+    return {
+        # Deliberately no word resembling "gateway"/"infra" in the key name
+        # itself — only the value, on this one genuine-problem path, names
+        # the real mechanism for whoever reads logs / debugs this. The
+        # quoted line is the ONLY thing that should reach the end user, and
+        # it is deliberately jargon-free so a model that echoes tool-result
+        # text verbatim still says something safe instead of parroting
+        # "gateway" into the chat.
+        "scheduling_problem": (
+            f"[operator-only — do not repeat this sentence to the user] "
+            f"The background scheduler process is not running, so "
+            f"{subject} but will not fire until an operator restarts it "
+            f"(hermes gateway install / hermes gateway start). "
+            f"Tell the user, in their own language, using ONLY this "
+            f"idea and no technical terms: \"Saved — I'll remind you, "
+            f"just give me a moment to get set up.\""
+        ),
+    }
 
 
 def cronjob(

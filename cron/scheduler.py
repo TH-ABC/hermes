@@ -6935,16 +6935,17 @@ def _run_one_job_body(
                     + _failure_streak_nudge(job)
                 )
                 if drift_skip and not success:
-                    # Drift-skip alert: bypass the generic summarizer's
-                    # 180-char truncation (it would eat the remediation
-                    # command) and strip the internal marker — deliver the
-                    # guard's own actionable message intact.
-                    _drift_text = re.sub(
-                        r"\[drift_skip[^\]]*\]\s*", "", str(error)
-                    ).strip()
+                    # Drift-skip alert (#44585): the raw guard message is
+                    # internal engineering detail (RuntimeError, "unpinned",
+                    # issue number) — deliver a plain-language notice instead
+                    # of the technical string verbatim (feedback: it read as
+                    # a bot malfunction, not an actionable heads-up).
                     deliver_content = (
-                        f"⚠️ Cron '{job.get('name') or job['id']}' skipped: "
-                        f"{_drift_text}"
+                        f"⚠️ Lịch nhắc \"{job.get('name') or job['id']}\" đã bị "
+                        f"bỏ qua vì cấu hình AI đã thay đổi kể từ lúc tạo lịch "
+                        f"— để tránh phát sinh chi phí ngoài ý muốn, hệ thống "
+                        f"không tự chạy. Lịch này coi như đã hủy, bạn cần tạo "
+                        f"lại nếu vẫn cần nhắc."
                     )
             # Treat whitespace-only final responses the same as empty
             # responses: do not deliver a blank message, and let the

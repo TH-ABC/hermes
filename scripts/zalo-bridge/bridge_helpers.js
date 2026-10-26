@@ -48,12 +48,20 @@ export function messageToEvent(message) {
     ? data.mentions.map((m) => ({ uid: m.uid, pos: m.pos, len: m.len }))
     : [];
 
+  // For `chat.photo`, `data.content` is zca-js's TAttachmentContent object
+  // (href = full-res download URL, thumb = thumbnail URL) rather than a
+  // plain string. Surface it so the Python adapter can download the image
+  // instead of falling back to a placeholder — other content_type values
+  // (video/file/voice/gif/sticker) stay unforwarded for now.
+  const isPhotoAttachment = data.msgType === 'chat.photo' && data.content && typeof data.content === 'object';
+
   return {
     chat_id: formatChatId(message.threadId, message.type),
     is_group: Boolean(isGroup),
     message_id: data.msgId !== undefined ? String(data.msgId) : null,
     text: typeof data.content === 'string' ? data.content : '',
     content_type: data.msgType || 'unknown',
+    attachment_url: isPhotoAttachment ? (data.content.href || data.content.thumb || null) : null,
     sender_id: data.uidFrom !== undefined ? String(data.uidFrom) : null,
     sender_name: data.dName || null,
     timestamp: data.ts !== undefined ? Number(data.ts) : null,

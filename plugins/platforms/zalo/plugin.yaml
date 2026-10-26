@@ -16,19 +16,23 @@ requires_env:
     password: false
 optional_env:
   - name: ZALO_ALLOWED_USERS
-    description: "Comma-separated Zalo user IDs allowed to talk to the bot"
-    prompt: "Allowed users (comma-separated)"
+    description: "Legacy escape hatch — setting this disables Zalo's own owner/group access policy (config.yaml platforms.zalo.extra.owner_id/group_allow_from/groups) and falls back to this flat platform-wide allowlist for every Zalo chat"
+    prompt: "Allowed users (comma-separated) — leave blank to use the owner/group policy instead"
     password: false
   - name: ZALO_ALLOW_ALL_USERS
-    description: "Allow any Zalo user to trigger the bot (dev only)"
-    prompt: "Allow all users? (true/false)"
+    description: "Legacy escape hatch — allow any Zalo user platform-wide, bypassing Zalo's own owner/group access policy entirely (not recommended)"
+    prompt: "Allow all users? (true/false) — leave false to use the owner/group policy instead"
     password: false
   - name: ZALO_HOME_CHANNEL
     description: "Default chat ID (e.g. u:123... or g:456...) for cron / notification delivery"
     prompt: "Home channel ID"
     password: false
+  - name: ZALO_DISABLE_DMS
+    description: "Disable direct messages so the bot only responds in allowed groups"
+    prompt: "Disable DMs? (true/false)"
+    password: false
   - name: ZALO_REQUIRE_MENTION
-    description: "Require an @mention of the bot before it responds in groups (DMs always respond)"
+    description: "Require an @mention of the bot before it responds in groups"
     prompt: "Require @mention in groups? (true/false)"
     password: false
   - name: ZALO_MENTION_NAME

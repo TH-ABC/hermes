@@ -10,14 +10,19 @@ bridged via Baileys in ``plugins/platforms/whatsapp/adapter.py``, which is the
 direct template for everything in this file.
 
 Unlike WhatsApp, Zalo has exactly one transport mode, so there is no shared
-behavior mixin here — this adapter owns its own (much smaller) gating logic
-directly. It also relies on the gateway's central identity authorization
-(``ZALO_ALLOWED_USERS`` / ``ZALO_ALLOW_ALL_USERS``, enforced by the gateway
-itself since ``enforces_own_access_policy`` is left at its default False)
-rather than re-implementing WhatsApp's local ``dm_policy``/``group_policy``
-surface. The only bespoke filtering this adapter does is group *mention*
-gating, which is a message-shaping concern the gateway's identity check
-doesn't cover.
+behavior mixin here. Like WeCom/Weixin/Yuanbao/QQBot/WhatsApp, this adapter
+owns its access policy directly (``enforces_own_access_policy`` returns
+True) instead of delegating identity to the gateway's generic
+``ZALO_ALLOWED_USERS``/``ZALO_ALLOW_ALL_USERS`` check: an owner-only DM
+baseline plus per-group chats members can be opened into on demand via
+in-chat ``!moquyenchat``/``!dongquyenchat`` needs live, per-sender,
+per-group, additive semantics a flat platform-wide allowlist can't express.
+See ``_is_dm_allowed``, ``_is_group_allowed``, ``_handle_chat_permission_
+command``. ``ZALO_ALLOWED_USERS``/``ZALO_ALLOW_ALL_USERS`` remain
+registered (see ``register()``) purely as a legacy escape hatch — setting
+either forces the gateway back to the flat platform-wide check for every
+Zalo chat (gateway/authz_mixin.py:610-618 requires both empty for the
+adapter-owned branch below to engage), bypassing everything in this file.
 """
 
 import asyncio
@@ -57,6 +62,31 @@ def _zenv(name: str, default: str = "") -> str:
 
 
 logger = logging.getLogger(__name__)
+
+
+def _save_hermes_config_value(key_path: str, value: Any) -> bool:
+    """Persist one dotted config.yaml key, preserving comments/ordering/
+    quotes (ruamel round-trip). Calls ``utils.atomic_roundtrip_yaml_update``
+    directly rather than importing the ~11k-line top-level ``cli.py`` (whose
+    ``save_config_value`` wraps the same call) from a platform plugin.
+
+    Single-writer assumption: correct for the live Zalo adapter process
+    mutating its own config, and for `hermes zalo` CLI commands run while
+    the gateway is stopped. Not safe against a second concurrent writer.
+    """
+    try:
+        from hermes_constants import get_hermes_home
+        from utils import atomic_roundtrip_yaml_update
+
+        atomic_roundtrip_yaml_update(get_hermes_home() / "config.yaml", key_path, value)
+        return True
+    except Exception as e:
+        logger.warning("Failed to persist config key %s: %s", key_path, e)
+        return False
+
+
+def save_zalo_extra_value(key: str, value: Any) -> bool:
+    return _save_hermes_config_value(f"platforms.zalo.extra.{key}", value)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -268,6 +298,7 @@ from gateway.platforms.base import (
     SendResult,
     cache_image_from_url,
 )
+from gateway.platforms.helpers import strip_markdown
 
 
 def _file_content_hash(path: Path) -> str:
@@ -335,6 +366,46 @@ def check_zalo_requirements() -> bool:
         return False
 
 
+_ALL_MENTION_RE = re.compile(r"@all\b", re.IGNORECASE)
+_CHAT_PERMISSION_COMMAND_RE = re.compile(r"(?:^|\s)!(moquyenchat|dongquyenchat)\b", re.IGNORECASE)
+# Bare "!new" shortcut for allowlisted senders (ZALO_NEW_COMMAND_USERS). Exists
+# because MessageEvent.is_command() only recognizes a literal leading "/", but
+# Zalo mentions are rendered as literal display-name text prepended to the
+# message ("@Bth /new"), which never satisfies that check — "/new" typed after
+# the mention is silently treated as normal chat instead of the real command.
+_NEW_SESSION_COMMAND_RE = re.compile(r"(?:^|\s)!new\b", re.IGNORECASE)
+
+# !promptcapnhat [noi dung] — owner-only durable instruction update. Bang-
+# prefixed for the same reason as the two commands above: a group @mention
+# is rendered as literal display-name text prepended to the message, which
+# breaks MessageEvent.is_command()'s leading-"/" check for a real slash
+# command. DOTALL since the update text may be multi-line.
+_PROMPT_UPDATE_COMMAND_RE = re.compile(
+    r"(?:^|\s)!promptcapnhat\b[ \t]*(.*)", re.IGNORECASE | re.DOTALL
+)
+
+
+def _utf16_len(s: str) -> int:
+    """UTF-16 code-unit length of ``s`` — zca-js mention pos/len are JS
+    string offsets, which count UTF-16 units, not Python codepoints."""
+    return len(s.encode("utf-16-le")) // 2
+
+
+def _find_all_mention(text: str) -> Optional[Dict[str, Any]]:
+    """Detect a literal ``@all`` the agent wrote and build the zca-js
+    mention entry that tags everyone in the group (uid "-1" is zca-js's
+    sentinel for @all — see scripts/zalo-bridge/node_modules/zca-js/dist/
+    apis/sendMessage.js). Only the first occurrence is tagged; harmless
+    no-op in DMs since the bridge only honors mentions for group threads.
+    """
+    match = _ALL_MENTION_RE.search(text)
+    if not match:
+        return None
+    pos = _utf16_len(text[: match.start()])
+    length = _utf16_len(match.group(0))
+    return {"pos": pos, "uid": "-1", "len": length}
+
+
 class ZaloAdapter(BasePlatformAdapter):
     """
     Zalo adapter, backed by the ``scripts/zalo-bridge/`` Node.js process
@@ -388,6 +459,21 @@ class ZaloAdapter(BasePlatformAdapter):
         self._free_response_chats = self._coerce_chat_set(
             config.extra.get("free_response_chats") or _zenv("ZALO_FREE_RESPONSE_CHATS")
         )
+        self._owner_id: str = str(config.extra.get("owner_id") or "").strip()
+        self._group_allow_from: set = self._coerce_chat_set(config.extra.get("group_allow_from"))
+        groups_raw = config.extra.get("groups")
+        self._groups: dict = dict(groups_raw) if isinstance(groups_raw, dict) else {}
+        # Fixed, non-configurable — Zalo intentionally exposes no
+        # open/disabled/pairing dial like WeCom's; the owner-only-DM +
+        # additive-per-group-opt-in contract above is the whole policy.
+        self._dm_policy = "allowlist"
+        self._group_policy = "allowlist"
+
+        disable_dms_raw = config.extra.get("disable_dms")
+        if disable_dms_raw is None:
+            disable_dms_raw = _zenv("ZALO_DISABLE_DMS", "false")
+        self._disable_dms = str(disable_dms_raw).strip().lower() in {"1", "true", "yes", "on"}
+        self._warn_if_legacy_access_env_set()
 
         # Best-effort chat display-name cache, populated from inbound events.
         # The bridge has no GET /chat/:id lookup in v1, so get_chat_info()
@@ -761,6 +847,14 @@ class ZaloAdapter(BasePlatformAdapter):
         self._close_bridge_log()
         print(f"[{self.name}] Disconnected")
 
+    def format_message(self, content: str) -> str:
+        """Strip markdown — Zalo renders it as literal characters (no bold/
+        headers/tables support), confirmed by observing raw ``**text**``
+        asterisks on-device despite the model being instructed not to use
+        markdown. Code-level stripping is the reliable guard since prompt
+        instructions alone aren't consistently followed by every model."""
+        return strip_markdown(content)
+
     async def send(
         self,
         chat_id: str,
@@ -792,9 +886,13 @@ class ZaloAdapter(BasePlatformAdapter):
             sent_message_ids: list[str] = []
             last_message_id = None
             for chunk in chunks:
+                payload: Dict[str, Any] = {"chat_id": chat_id, "text": chunk}
+                all_mention = _find_all_mention(chunk)
+                if all_mention:
+                    payload["mentions"] = [all_mention]
                 async with self._http_session.post(
                     f"http://127.0.0.1:{self._bridge_port}/send",
-                    json={"chat_id": chat_id, "text": chunk},
+                    json=payload,
                     timeout=aiohttp.ClientTimeout(total=30),
                 ) as resp:
                     if resp.status == 200:
@@ -976,12 +1074,85 @@ class ZaloAdapter(BasePlatformAdapter):
 
             await asyncio.sleep(1)  # Poll interval
 
+    def _warn_if_legacy_access_env_set(self) -> None:
+        """``ZALO_ALLOWED_USERS``/``ZALO_ALLOW_ALL_USERS`` silently disable
+        the owner/group policy below at the gateway layer (see module
+        docstring). Most operators who still have either set inherited it
+        from before this adapter owned its own access policy."""
+        stale = [n for n in ("ZALO_ALLOWED_USERS", "ZALO_ALLOW_ALL_USERS") if _zenv(n, "").strip()]
+        if stale:
+            msg = (
+                f"[{self.name}] {', '.join(stale)} is set — this DISABLES the "
+                "owner-only DM / per-group !moquyenchat policy for ALL Zalo "
+                f"chats. Clear {'/'.join(stale)} in .env and restart to use it."
+            )
+            logger.warning(msg)
+            print(msg)
+
+    @property
+    def enforces_own_access_policy(self) -> bool:
+        """Zalo gates DM/group access at intake itself — see
+        _is_dm_allowed/_is_group_allowed, enforced in _build_message_event
+        before any MessageEvent is constructed."""
+        return True
+
+    def _sender_is_owner(self, sender_id: str) -> bool:
+        sender_id = str(sender_id or "").strip()
+        return bool(sender_id) and bool(self._owner_id) and sender_id == self._owner_id
+
+    def _is_dm_allowed(self, sender_id: str) -> bool:
+        """Standing baseline: only the configured owner may ever DM the
+        bot. Fails closed when no owner is configured (fresh install)."""
+        if self._disable_dms:
+            return False
+        return self._sender_is_owner(sender_id)
+
+    def _resolve_group_cfg(self, chat_id: str) -> Dict[str, Any]:
+        """Exact match, then case-insensitive. Deliberately NO '*' wildcard
+        group-key fallback (unlike WeCom's equivalent) — an unconfigured
+        group must never inherit another entry's permissiveness; only a
+        chat_id explicitly opened via !moquyenchat is ever 'open'."""
+        cfg = self._groups.get(chat_id)
+        if isinstance(cfg, dict):
+            return cfg
+        lowered = chat_id.lower()
+        for key, value in self._groups.items():
+            if isinstance(key, str) and key.lower() == lowered and isinstance(value, dict):
+                return value
+        return {}
+
+    def _is_group_opened(self, chat_id: str) -> bool:
+        allow_from = self._resolve_group_cfg(chat_id).get("allow_from")
+        if isinstance(allow_from, str):
+            return allow_from.strip() == "*"
+        if isinstance(allow_from, (list, tuple, set)):
+            return "*" in {str(v).strip() for v in allow_from}
+        return False
+
+    def _is_group_allowed(self, chat_id: str, sender_id: str) -> bool:
+        """Owner is always allowed; else additive per-group opt-in
+        (!moquyenchat) or the flat regular allowlist. Never defaults to
+        open for a chat_id that was never explicitly opened."""
+        sender_id = str(sender_id or "").strip()
+        if self._sender_is_owner(sender_id):
+            return True
+        if self._is_group_opened(chat_id):
+            return True
+        return bool(sender_id) and ("*" in self._group_allow_from or sender_id in self._group_allow_from)
+
+    def _is_message_access_allowed(self, data: Dict[str, Any]) -> bool:
+        """Real identity gate — must run before a MessageEvent is built."""
+        sender_id = str(data.get("sender_id") or "").strip()
+        if not sender_id:
+            return False
+        if data.get("is_group"):
+            return self._is_group_allowed(str(data.get("chat_id") or ""), sender_id)
+        return self._is_dm_allowed(sender_id)
+
     def _should_respond(self, data: Dict[str, Any]) -> bool:
-        """DMs always respond. Groups respond when mention-gating is off,
-        the chat is in the free-response allowlist, or the bot was
-        @-mentioned (structured ``mentions[].uid`` match against the
-        persisted own uid, with a text-substring fallback for when that
-        uid isn't available)."""
+        """Mention-gating for GROUP chats only — access control is decided
+        separately by ``_is_message_access_allowed()``. DMs always proceed
+        once access-allowed (no mention needed)."""
         if not data.get("is_group"):
             return True
         if not self._require_mention:
@@ -997,20 +1168,160 @@ class ZaloAdapter(BasePlatformAdapter):
                 return True
         return False
 
+    def _sender_can_manage_chat_permissions(self, data: Dict[str, Any]) -> bool:
+        """Only the configured owner may open/close group chat permissions.
+        Deliberately does NOT consult ZALO_ALLOW_ALL_USERS/ZALO_ALLOWED_USERS
+        — that was a self-widening privilege-escalation bug (once
+        !moquyenchat ran once, ALLOW_ALL_USERS became true, which this same
+        check then treated as authorization to run it again for anyone)."""
+        return self._sender_is_owner(str(data.get("sender_id") or ""))
+
+    async def _handle_chat_permission_command(self, data: Dict[str, Any]) -> bool:
+        text = str(data.get("text") or "").strip()
+        match = _CHAT_PERMISSION_COMMAND_RE.search(text)
+        if not match:
+            return False
+
+        chat_id = str(data.get("chat_id") or "").strip()
+        if not data.get("is_group") or not chat_id.startswith("g:"):
+            if chat_id:
+                await self.send(chat_id, "Lenh nay chi dung trong group Zalo.")
+            return True
+
+        if not self._sender_can_manage_chat_permissions(data):
+            await self.send(chat_id, "Ban chua co quyen mo/dong quyen chat bot.")
+            return True
+
+        command = match.group(1).lower()
+        if command == "moquyenchat":
+            ok = self._open_group(chat_id)
+            msg = "Da mo quyen: moi nguoi trong group nay co the goi bot."
+        else:
+            ok = self._close_group(chat_id)
+            msg = "Da dong quyen chat group nay. Cac group khac da mo van khong doi."
+        if not ok:
+            msg += " (Canh bao: khong luu duoc vao config.yaml — se mat sau khi restart.)"
+        await self.send(chat_id, msg)
+        return True
+
+    def _open_group(self, chat_id: str) -> bool:
+        """Additive: adds chat_id, never touches any other group's entry."""
+        groups = dict(self._groups)
+        groups[chat_id] = {"allow_from": ["*"]}
+        self._groups = groups
+        return save_zalo_extra_value("groups", groups)
+
+    def _close_group(self, chat_id: str) -> bool:
+        """Removes only chat_id; every other opened group is untouched."""
+        groups = dict(self._groups)
+        lowered = chat_id.lower()
+        for key in [k for k in groups if isinstance(k, str) and k.lower() == lowered]:
+            groups.pop(key, None)
+        self._groups = groups
+        return save_zalo_extra_value("groups", groups)
+
+    async def _handle_prompt_update_command(self, data: Dict[str, Any]) -> bool:
+        """Owner-only ``!promptcapnhat [noi dung]`` — durably appends to
+        ``agent.system_prompt`` (config.yaml), or with no text, echoes the
+        current value back. Requires a gateway restart to take effect,
+        since ``agent.system_prompt`` is frozen at GatewayRunner startup."""
+        text = str(data.get("text") or "")
+        match = _PROMPT_UPDATE_COMMAND_RE.search(text)
+        if not match:
+            return False
+
+        chat_id = str(data.get("chat_id") or "").strip()
+        if not chat_id:
+            return True
+
+        if not self._sender_is_owner(str(data.get("sender_id") or "")):
+            await self.send(chat_id, "Ban khong co quyen dung lenh nay.")
+            return True
+
+        from hermes_cli.config import load_config
+
+        current_prompt = str((load_config().get("agent") or {}).get("system_prompt") or "").strip()
+        new_text = match.group(1).strip()
+
+        if not new_text:
+            if not current_prompt:
+                await self.send(chat_id, "Chua co noi dung system prompt tuy chinh nao.")
+            else:
+                preview = current_prompt[:3500]
+                suffix = "\n... (con nua)" if len(current_prompt) > 3500 else ""
+                await self.send(chat_id, f"System prompt hien tai:\n\n{preview}{suffix}")
+            return True
+
+        from datetime import datetime
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        updated_prompt = (
+            f"{current_prompt}\n\n---\n\n# CAP NHAT ({today})\n\n{new_text}"
+            if current_prompt else new_text
+        )
+        ok = _save_hermes_config_value("agent.system_prompt", updated_prompt)
+        await self.send(
+            chat_id,
+            "Da luu. Can gateway khoi dong lai moi ap dung — nhan /restart "
+            "(nhan tin rieng cho bot) de ap dung ngay."
+            if ok else "Luu that bai, thu lai sau.",
+        )
+        return True
+
+    def _sender_can_use_new_command(self, data: Dict[str, Any]) -> bool:
+        """Restrict the bare "!new" shortcut to a specific allowlist.
+
+        Deliberately separate from ``ZALO_ALLOWED_USERS``/``ZALO_ALLOW_ALL_USERS``
+        (identity gating for talking to the bot at all) — a group opened via
+        ``!moquyenchat`` sets ``ZALO_ALLOW_ALL_USERS=true`` for everyone, but
+        resetting someone else's session is a more sensitive action that
+        should stay opt-in per user via ``ZALO_NEW_COMMAND_USERS``.
+        """
+        allowed = self._coerce_chat_set(_zenv("ZALO_NEW_COMMAND_USERS", ""))
+        sender_id = str(data.get("sender_id") or "").strip()
+        return bool(sender_id and ("*" in allowed or sender_id in allowed))
+
+    def _rewrite_new_session_command(self, data: Dict[str, Any]) -> bool:
+        """Rewrite a bare "!new" from an allowlisted sender into a real "/new".
+
+        Returns True when the rewrite happened, so the caller can skip the
+        normal @mention gate for this one message — the sender is already
+        independently authorized via ``ZALO_NEW_COMMAND_USERS``, so no
+        confirmation step and no mention are required. Mutates ``data``
+        in place so the MessageEvent built downstream carries plain "/new",
+        which MessageEvent.is_command() recognizes.
+        """
+        text = str(data.get("text") or "")
+        if not _NEW_SESSION_COMMAND_RE.search(text):
+            return False
+        if not self._sender_can_use_new_command(data):
+            return False
+        data["text"] = "/new"
+        return True
+
     async def _build_message_event(self, data: Dict[str, Any]) -> Optional[MessageEvent]:
         """Build a MessageEvent from a bridge message event.
 
-        The bridge has no inbound-media forwarding in v1 (``messageToEvent``
-        only surfaces plain-string text plus a ``content_type`` label for
-        media messages) — a media message becomes a short descriptive
-        placeholder rather than a downloadable attachment.
+        The bridge has no inbound-media forwarding in v1 for most content
+        types (``messageToEvent`` only surfaces plain-string text plus a
+        ``content_type`` label) — those become a short descriptive
+        placeholder rather than a downloadable attachment. ``chat.photo`` is
+        the one exception: the bridge forwards zca-js's attachment URL and
+        this downloads it so the agent can actually view the image.
         """
         try:
             # Defense in depth: the bridge already suppresses its own
             # outbound-message echo (`if (message.isSelf) return;`).
             if data.get("is_self"):
                 return None
-            if not self._should_respond(data):
+            if await self._handle_chat_permission_command(data):
+                return None
+            if await self._handle_prompt_update_command(data):
+                return None
+            is_new_session_cmd = self._rewrite_new_session_command(data)
+            if not is_new_session_cmd and not (
+                self._is_message_access_allowed(data) and self._should_respond(data)
+            ):
                 return None
 
             chat_id = str(data.get("chat_id") or "")
@@ -1022,7 +1333,26 @@ class ZaloAdapter(BasePlatformAdapter):
 
             text = str(data.get("text") or "")
             content_type = str(data.get("content_type") or "").strip()
-            if not text and content_type:
+            media_urls: list[str] = []
+            media_types: list[str] = []
+            attachment_url = data.get("attachment_url")
+            if content_type == "chat.photo" and attachment_url:
+                try:
+                    local_path = await cache_image_from_url(str(attachment_url))
+                    media_urls.append(local_path)
+                    # Must be a real MIME type: gateway/run.py's
+                    # _event_media_is_image() only recognizes attachments whose
+                    # media_type starts with "image/" — a bare "image" string
+                    # falls through and the photo never reaches the model as
+                    # actual vision content (silently degrades to a text note).
+                    media_types.append("image/jpeg")
+                    if not text:
+                        text = "[Sent a photo]"
+                except Exception as e:
+                    logger.warning("[%s] Failed to download inbound photo: %s", self.name, e)
+                    if not text:
+                        text = "[Received a photo message — download failed]"
+            elif not text and content_type:
                 text = f"[Received a {content_type} message — media forwarding is not supported yet]"
 
             source = self.build_source(
@@ -1035,10 +1365,12 @@ class ZaloAdapter(BasePlatformAdapter):
 
             return MessageEvent(
                 text=text,
-                message_type=MessageType.TEXT,
+                message_type=MessageType.PHOTO if media_urls else MessageType.TEXT,
                 source=source,
                 raw_message=data,
                 message_id=data.get("message_id"),
+                media_urls=media_urls,
+                media_types=media_types,
             )
         except Exception as e:
             print(f"[{self.name}] Error building event: {e}")
@@ -1142,6 +1474,8 @@ def _apply_yaml_config(yaml_cfg: dict, zalo_cfg: dict) -> dict | None:
         if isinstance(frc, list):
             frc = ",".join(str(v) for v in frc)
         os.environ["ZALO_FREE_RESPONSE_CHATS"] = str(frc)
+    if "disable_dms" in zalo_cfg and not os.getenv("ZALO_DISABLE_DMS"):
+        os.environ["ZALO_DISABLE_DMS"] = str(zalo_cfg["disable_dms"]).lower()
     if "bridge_port" in zalo_cfg and not os.getenv("ZALO_BRIDGE_PORT"):
         os.environ["ZALO_BRIDGE_PORT"] = str(zalo_cfg["bridge_port"])
     return None
@@ -1197,13 +1531,19 @@ def register(ctx) -> None:
             "bold, headers, or tables); for lists, use line breaks and '-' "
             "bullets. Default to Vietnamese when the user writes in Vietnamese. "
             "In group chats you only see messages that @mention you, or that "
-            "come from a chat explicitly configured to always respond — direct "
-            "messages always reach you, and you don't need a mention there. "
+            "come from a chat explicitly configured to always respond. Direct "
+            "messages may be disabled by the operator; when they are enabled, "
+            "they don't need a mention. "
             "You can send media files natively: include "
             "MEDIA:/absolute/path/to/file in your response; images and other "
-            "files are delivered as native Zalo attachments. Inbound media from "
-            "the user arrives only as a description, not a file — you cannot "
-            "read or view attachments the user sends."
+            "files are delivered as native Zalo attachments. A photo the user "
+            "sends IS downloaded and given to you to actually view. Other "
+            "inbound media (video/file/voice/gif/sticker) still arrives only "
+            "as a description, not a file — you cannot view those. In a GROUP chat, you can "
+            "tag everyone by writing the literal text '@all' in your response "
+            "(e.g. '@all Chào cả nhà...') — it renders as a real tappable "
+            "@all mention, not a link. Only use it when actually addressing "
+            "the whole group (e.g. a self-introduction), not in every reply."
         ),
     )
 
@@ -1212,4 +1552,11 @@ def register(ctx) -> None:
         help="Set up and manage the Zalo integration (QR pairing via a Node.js bridge)",
         setup_fn=_cli.register_cli,
         handler_fn=_cli.dispatch,
+    )
+
+    from . import group_memory as _group_memory
+
+    ctx.register_hook("pre_gateway_dispatch", _group_memory.on_pre_gateway_dispatch)
+    ctx.register_system_prompt_section(
+        "zalo-group-memory", _group_memory.zalo_group_summary_section, max_chars=4000,
     )

@@ -53,7 +53,8 @@ def _mock_health(json_data, status=200):
 
 def _make_adapter(bridge_script="/tmp/test-zalo-bridge.js", session_path=None,
                    require_mention=True, mention_name="", free_response_chats=None,
-                   own_uid=None):
+                   own_uid=None, disable_dms=False, owner_id="", group_allow_from=None,
+                   groups=None):
     """Create a ZaloAdapter with test attributes (bypass __init__)."""
     from plugins.platforms.zalo.adapter import ZaloAdapter
 
@@ -68,6 +69,12 @@ def _make_adapter(bridge_script="/tmp/test-zalo-bridge.js", session_path=None,
     adapter._require_mention = require_mention
     adapter._mention_name = mention_name
     adapter._free_response_chats = free_response_chats or set()
+    adapter._disable_dms = disable_dms
+    adapter._owner_id = owner_id
+    adapter._group_allow_from = group_allow_from or set()
+    adapter._groups = groups or {}
+    adapter._dm_policy = "allowlist"
+    adapter._group_policy = "allowlist"
     adapter._chat_names = {}
     adapter._bridge_log_fh = None
     adapter._bridge_log = None
@@ -161,6 +168,7 @@ class TestPluginYamlManifest:
             "ZALO_ALLOWED_USERS",
             "ZALO_ALLOW_ALL_USERS",
             "ZALO_HOME_CHANNEL",
+            "ZALO_DISABLE_DMS",
             "ZALO_REQUIRE_MENTION",
             "ZALO_MENTION_NAME",
             "ZALO_FREE_RESPONSE_CHATS",
@@ -180,7 +188,7 @@ class TestConfigDefaults:
         if monkeypatch is not None:
             for var in (
                 "ZALO_BRIDGE_PORT", "ZALO_REQUIRE_MENTION", "ZALO_MENTION_NAME",
-                "ZALO_FREE_RESPONSE_CHATS",
+                "ZALO_FREE_RESPONSE_CHATS", "ZALO_DISABLE_DMS",
             ):
                 monkeypatch.delenv(var, raising=False)
         config = PlatformConfig(enabled=True, extra=extra or {})
@@ -226,6 +234,52 @@ class TestConfigDefaults:
     def test_free_response_chats_empty_by_default(self, monkeypatch):
         adapter = self._build(monkeypatch=monkeypatch)
         assert adapter._free_response_chats == set()
+
+    def test_owner_id_empty_by_default(self, monkeypatch):
+        adapter = self._build(monkeypatch=monkeypatch)
+        assert adapter._owner_id == ""
+
+    def test_owner_id_from_extra(self, monkeypatch):
+        adapter = self._build(extra={"owner_id": "u:1"}, monkeypatch=monkeypatch)
+        assert adapter._owner_id == "u:1"
+
+    def test_group_allow_from_string_form(self, monkeypatch):
+        adapter = self._build(
+            extra={"group_allow_from": "u:1, u:2 ,u:3"}, monkeypatch=monkeypatch
+        )
+        assert adapter._group_allow_from == {"u:1", "u:2", "u:3"}
+
+    def test_group_allow_from_list_form(self, monkeypatch):
+        adapter = self._build(
+            extra={"group_allow_from": ["u:1", "u:2"]}, monkeypatch=monkeypatch
+        )
+        assert adapter._group_allow_from == {"u:1", "u:2"}
+
+    def test_group_allow_from_empty_by_default(self, monkeypatch):
+        adapter = self._build(monkeypatch=monkeypatch)
+        assert adapter._group_allow_from == set()
+
+    def test_groups_empty_dict_by_default(self, monkeypatch):
+        adapter = self._build(monkeypatch=monkeypatch)
+        assert adapter._groups == {}
+
+    def test_groups_dict_from_extra(self, monkeypatch):
+        adapter = self._build(
+            extra={"groups": {"g:1": {"allow_from": ["*"]}}}, monkeypatch=monkeypatch
+        )
+        assert adapter._groups == {"g:1": {"allow_from": ["*"]}}
+
+    def test_enforces_own_access_policy_is_true(self, monkeypatch):
+        adapter = self._build(monkeypatch=monkeypatch)
+        assert adapter.enforces_own_access_policy is True
+
+    def test_disable_dms_false_by_default(self, monkeypatch):
+        adapter = self._build(monkeypatch=monkeypatch)
+        assert adapter._disable_dms is False
+
+    def test_disable_dms_true_via_extra(self, monkeypatch):
+        adapter = self._build(extra={"disable_dms": "true"}, monkeypatch=monkeypatch)
+        assert adapter._disable_dms is True
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +329,195 @@ class TestShouldRespond:
         adapter = _make_adapter(require_mention=True, own_uid="999")
         data = {"is_group": True, "chat_id": "g:1", "text": "hi", "mentions": []}
         assert adapter._should_respond(data) is False
+
+
+class TestAccessControl:
+    # --- DMs ---
+    def test_dm_owner_allowed(self):
+        adapter = _make_adapter(owner_id="u:owner")
+        assert adapter._is_dm_allowed("u:owner") is True
+
+    def test_dm_non_owner_denied(self):
+        adapter = _make_adapter(owner_id="u:owner")
+        assert adapter._is_dm_allowed("u:other") is False
+
+    def test_dm_denied_when_no_owner_configured(self):
+        adapter = _make_adapter(owner_id="")
+        assert adapter._is_dm_allowed("u:anyone") is False
+
+    def test_dm_denied_for_owner_when_disabled(self):
+        adapter = _make_adapter(owner_id="u:owner", disable_dms=True)
+        assert adapter._is_dm_allowed("u:owner") is False
+
+    # --- Groups ---
+    def test_group_owner_always_allowed(self):
+        adapter = _make_adapter(owner_id="u:owner")
+        assert adapter._is_group_allowed("g:unopened", "u:owner") is True
+
+    def test_group_opened_allows_any_sender(self):
+        adapter = _make_adapter(groups={"g:main": {"allow_from": ["*"]}})
+        assert adapter._is_group_allowed("g:main", "u:random") is True
+
+    def test_group_unopened_allows_group_allow_from_member(self):
+        adapter = _make_adapter(group_allow_from={"u:1", "u:2"})
+        assert adapter._is_group_allowed("g:other", "u:1") is True
+
+    def test_group_unopened_denies_non_listed_sender(self):
+        adapter = _make_adapter(group_allow_from={"u:1"})
+        assert adapter._is_group_allowed("g:other", "u:2") is False
+
+    def test_group_allow_from_wildcard(self):
+        adapter = _make_adapter(group_allow_from={"*"})
+        assert adapter._is_group_allowed("g:other", "u:anyone") is True
+
+    # --- _is_message_access_allowed end-to-end ---
+    def test_message_access_missing_sender_id_denied(self):
+        adapter = _make_adapter(owner_id="u:owner")
+        assert adapter._is_message_access_allowed({"is_group": False, "sender_id": ""}) is False
+
+    def test_message_access_dm_owner_allowed(self):
+        adapter = _make_adapter(owner_id="u:owner")
+        assert adapter._is_message_access_allowed(
+            {"is_group": False, "sender_id": "u:owner"}
+        ) is True
+
+    def test_message_access_group_opened_allowed(self):
+        adapter = _make_adapter(groups={"g:main": {"allow_from": ["*"]}})
+        assert adapter._is_message_access_allowed(
+            {"is_group": True, "chat_id": "g:main", "sender_id": "u:random"}
+        ) is True
+
+
+class TestChatPermissionCommands:
+    @pytest.mark.asyncio
+    async def test_open_chat_permission_adds_without_removing_other_groups(self, monkeypatch):
+        """!moquyenchat is additive — opening a new group must not disturb a
+        pre-existing different group's entry (the union-not-replace fix)."""
+        adapter = _make_adapter(owner_id="u:owner", groups={"g:other": {"allow_from": ["*"]}})
+        adapter.send = AsyncMock()
+        saved = {}
+        monkeypatch.setattr(
+            "plugins.platforms.zalo.adapter.save_zalo_extra_value",
+            lambda k, v: saved.__setitem__(k, v) or True,
+        )
+
+        handled = await adapter._handle_chat_permission_command({
+            "is_group": True,
+            "chat_id": "g:main",
+            "sender_id": "u:owner",
+            "text": "!moquyenchat",
+        })
+
+        assert handled is True
+        assert adapter._groups["g:main"] == {"allow_from": ["*"]}
+        assert adapter._groups["g:other"] == {"allow_from": ["*"]}
+        assert saved["groups"] == adapter._groups
+        adapter.send.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_close_chat_permission_removes_only_current_group(self, monkeypatch):
+        adapter = _make_adapter(
+            owner_id="u:owner",
+            groups={"g:main": {"allow_from": ["*"]}, "g:other": {"allow_from": ["*"]}},
+        )
+        adapter.send = AsyncMock()
+        saved = {}
+        monkeypatch.setattr(
+            "plugins.platforms.zalo.adapter.save_zalo_extra_value",
+            lambda k, v: saved.__setitem__(k, v) or True,
+        )
+
+        handled = await adapter._handle_chat_permission_command({
+            "is_group": True,
+            "chat_id": "g:main",
+            "sender_id": "u:owner",
+            "text": "!dongquyenchat",
+        })
+
+        assert handled is True
+        assert "g:main" not in adapter._groups
+        assert adapter._groups["g:other"] == {"allow_from": ["*"]}
+        adapter.send.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_chat_permission_command_rejects_non_owner_sender(self, monkeypatch):
+        adapter = _make_adapter(owner_id="u:owner")
+        adapter.send = AsyncMock()
+        saved = {}
+        monkeypatch.setattr(
+            "plugins.platforms.zalo.adapter.save_zalo_extra_value",
+            lambda k, v: saved.__setitem__(k, v) or True,
+        )
+
+        handled = await adapter._handle_chat_permission_command({
+            "is_group": True,
+            "chat_id": "g:main",
+            "sender_id": "u:other",
+            "text": "!moquyenchat",
+        })
+
+        assert handled is True
+        assert adapter._groups == {}
+        assert saved == {}
+        adapter.send.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_chat_permission_command_ignores_legacy_allow_all_users(self, monkeypatch):
+        """Regression guard for the self-widening privilege-escalation bug:
+        a non-owner sender must stay rejected even when the legacy
+        ZALO_ALLOW_ALL_USERS/ZALO_ALLOWED_USERS env vars would have allowed
+        them under the old model."""
+        adapter = _make_adapter(owner_id="u:owner")
+        adapter.send = AsyncMock()
+        monkeypatch.setenv("ZALO_ALLOW_ALL_USERS", "true")
+        monkeypatch.setenv("ZALO_ALLOWED_USERS", "u:other")
+
+        handled = await adapter._handle_chat_permission_command({
+            "is_group": True,
+            "chat_id": "g:main",
+            "sender_id": "u:other",
+            "text": "!moquyenchat",
+        })
+
+        assert handled is True
+        assert adapter._groups == {}
+
+    @pytest.mark.asyncio
+    async def test_chat_permission_commands_do_not_touch_dm_or_mention_settings(self, monkeypatch):
+        adapter = _make_adapter(owner_id="u:owner", disable_dms=False, require_mention=True)
+        adapter.send = AsyncMock()
+        monkeypatch.setattr(
+            "plugins.platforms.zalo.adapter.save_zalo_extra_value", lambda k, v: True
+        )
+
+        await adapter._handle_chat_permission_command({
+            "is_group": True, "chat_id": "g:main", "sender_id": "u:owner", "text": "!moquyenchat",
+        })
+        assert adapter._disable_dms is False
+        assert adapter._require_mention is True
+
+        await adapter._handle_chat_permission_command({
+            "is_group": True, "chat_id": "g:main", "sender_id": "u:owner", "text": "!dongquyenchat",
+        })
+        assert adapter._disable_dms is False
+        assert adapter._require_mention is True
+
+    @pytest.mark.asyncio
+    async def test_open_chat_permission_persist_failure_still_applies_in_memory(self, monkeypatch):
+        adapter = _make_adapter(owner_id="u:owner")
+        adapter.send = AsyncMock()
+        monkeypatch.setattr(
+            "plugins.platforms.zalo.adapter.save_zalo_extra_value", lambda k, v: False
+        )
+
+        handled = await adapter._handle_chat_permission_command({
+            "is_group": True, "chat_id": "g:main", "sender_id": "u:owner", "text": "!moquyenchat",
+        })
+
+        assert handled is True
+        assert adapter._groups["g:main"] == {"allow_from": ["*"]}
+        sent_text = adapter.send.await_args.args[1]
+        assert "khong luu duoc" in sent_text
 
 
 # ---------------------------------------------------------------------------
@@ -587,7 +830,8 @@ class TestApplyYamlConfig:
 
         for var in (
             "ZALO_REQUIRE_MENTION", "ZALO_MENTION_NAME",
-            "ZALO_FREE_RESPONSE_CHATS", "ZALO_BRIDGE_PORT",
+            "ZALO_FREE_RESPONSE_CHATS",
+            "ZALO_DISABLE_DMS", "ZALO_BRIDGE_PORT",
         ):
             monkeypatch.delenv(var, raising=False)
 
@@ -595,6 +839,7 @@ class TestApplyYamlConfig:
             "require_mention": False,
             "mention_name": "Hermes",
             "free_response_chats": ["g:1", "g:2"],
+            "disable_dms": True,
             "bridge_port": 4000,
         })
 
@@ -602,6 +847,7 @@ class TestApplyYamlConfig:
         assert __import__("os").environ["ZALO_REQUIRE_MENTION"] == "false"
         assert __import__("os").environ["ZALO_MENTION_NAME"] == "Hermes"
         assert __import__("os").environ["ZALO_FREE_RESPONSE_CHATS"] == "g:1,g:2"
+        assert __import__("os").environ["ZALO_DISABLE_DMS"] == "true"
         assert __import__("os").environ["ZALO_BRIDGE_PORT"] == "4000"
 
     def test_env_takes_precedence_over_yaml(self, monkeypatch):

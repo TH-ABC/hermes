@@ -76,7 +76,7 @@ The gateway starts the Zalo bridge automatically using the saved session under `
 
 ## Mention Gating in Groups
 
-Zalo groups are **mention-gated by default** — the bot only responds to messages that either @-mention it or come from a chat explicitly configured to always respond. **Direct messages always respond**, no mention required.
+Zalo groups are **mention-gated by default** — the bot only responds to messages that either @-mention it or come from a chat explicitly configured to always respond. **Direct messages never require a mention**, but are owner-only by default — see [Access Control & Chat Permission Commands](#access-control--chat-permission-commands) below.
 
 | Setting | Purpose |
 |---------|---------|
@@ -96,10 +96,6 @@ Add the following to your `~/.hermes/.env` file:
 # Required
 ZALO_ENABLED=true
 
-# Access control
-ZALO_ALLOWED_USERS=user_id_1,user_id_2   # Comma-separated Zalo user IDs
-# ZALO_ALLOW_ALL_USERS=true              # OR allow any Zalo user (dev only)
-
 # Group mention gating (optional — defaults shown)
 ZALO_REQUIRE_MENTION=true
 ZALO_MENTION_NAME=
@@ -112,7 +108,57 @@ ZALO_HOME_CHANNEL=u:123456789
 ZALO_BRIDGE_PORT=3050
 ```
 
+Access control (who may DM the bot, and which groups it responds in) lives in `~/.hermes/config.yaml`, not `.env` — see the next section.
+
 See the full list in [Environment Variables → Zalo](/reference/environment-variables#zalo-bridge-zca-js).
+
+---
+
+## Access Control & Chat Permission Commands
+
+Unlike most Hermes platforms, Zalo owns its own access policy directly (it does not use `ZALO_ALLOWED_USERS`/`ZALO_ALLOW_ALL_USERS` — see the note at the end of this section). Configure it under `platforms.zalo.extra` in `~/.hermes/config.yaml`:
+
+```yaml
+platforms:
+  zalo:
+    enabled: true
+    extra:
+      owner_id: "your_zalo_uid"       # the only account that may DM the bot
+      group_allow_from: []            # uids allowed in groups NOT opened via !moquyenchat ("*" = everyone)
+      groups: {}                      # populated automatically by !moquyenchat/!dongquyenchat
+      disable_dms: false              # true blocks DMs entirely, including the owner
+```
+
+Set the owner without re-pairing:
+
+```bash
+hermes zalo owner <your_uid>   # or with no argument, print the current owner
+```
+
+**DMs** are owner-only: only `owner_id` may message the bot directly. With no `owner_id` configured, DMs are blocked for everyone (fail-closed) until you set one.
+
+**Groups** default to closed. Members can talk to the bot in a group once either:
+- they're listed in `group_allow_from` (or it contains `"*"`), or
+- the group was opened with `!moquyenchat` (see below) — the owner is always allowed everywhere, including groups they haven't opened yet.
+
+### `!moquyenchat` / `!dongquyenchat`
+
+Typed as a plain message in a group (owner only):
+
+| Command | Effect |
+|---------|--------|
+| `!moquyenchat` | Opens **this group** to every member — additive, does not affect any other group or DMs |
+| `!dongquyenchat` | Closes **this group** back down to the regular `group_allow_from` list — does not affect any other group |
+
+Both persist to `config.yaml` (`platforms.zalo.extra.groups`) immediately — no gateway restart needed.
+
+### `!promptcapnhat [nội dung]`
+
+Owner-only. Appends `nội dung` as a dated addition to `agent.system_prompt` in `config.yaml`, so the bot's instructions can be tuned from chat instead of editing files. With no text, echoes back the current system prompt. **Requires a gateway restart** to take effect (`agent.system_prompt` is loaded once at gateway startup) — send `/restart` as a DM afterward.
+
+:::note Legacy escape hatch
+Setting `ZALO_ALLOWED_USERS` or `ZALO_ALLOW_ALL_USERS` in `.env` disables everything above and falls back to a flat, platform-wide allowlist for every Zalo chat. Leave both unset to use the owner/group model.
+:::
 
 ---
 
@@ -159,14 +205,14 @@ This is a Phase 1 integration: Zalo reuses Hermes's existing general-purpose too
 | **Bot goes offline unexpectedly** | Check whether Zalo Web or Zalo Desktop was opened with the same account — only one web-listener session is allowed at a time. |
 | **Account temporarily locked** | This is a known risk of unofficial automation. Wait it out, use a secondary account going forward, and avoid bulk/spam-like behavior. |
 | **@mention not triggering a group response** | Confirm `~/.hermes/platforms/zalo/session/own_id.txt` exists (run `hermes zalo status`); if missing, the adapter recovers it automatically on the next successful bridge connection. As a fallback, set `ZALO_MENTION_NAME` to the bot's display name. |
-| **Messages not being received at all** | Verify `ZALO_ALLOWED_USERS` includes the sender's Zalo user ID, or set `ZALO_ALLOW_ALL_USERS=true` for testing. |
+| **Messages not being received at all** | Check `hermes zalo status` for the configured owner and opened groups. DMs only work from `platforms.zalo.extra.owner_id`; a group only works once it's opened via `!moquyenchat` or the sender is in `group_allow_from`. |
 
 ---
 
 ## Security
 
 :::warning
-**Configure access control** before going live. Set `ZALO_ALLOWED_USERS` with specific Zalo user IDs, or `ZALO_ALLOW_ALL_USERS=true` only for local testing. Without either, the gateway denies incoming messages as a safety measure.
+**Set `platforms.zalo.extra.owner_id`** before going live — with no owner configured, DMs are blocked for everyone (including you) and `!moquyenchat`/`!dongquyenchat`/`!promptcapnhat` are unusable. Groups default to closed until explicitly opened. See [Access Control & Chat Permission Commands](#access-control--chat-permission-commands).
 :::
 
 - The `~/.hermes/platforms/zalo/session` directory contains full session credentials — protect it like a password

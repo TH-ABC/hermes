@@ -266,7 +266,7 @@ app.post('/send', async (req, res) => {
   if (!api || connectionState !== 'connected') {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
-  const { chat_id: chatId, text } = req.body || {};
+  const { chat_id: chatId, text, mentions } = req.body || {};
   if (!chatId || !text) {
     return res.status(400).json({ error: 'chat_id and text are required' });
   }
@@ -277,8 +277,15 @@ app.post('/send', async (req, res) => {
     return res.status(400).json({ error: err.message });
   }
   try {
+    // ``mentions`` (optional): [{pos, uid, len}]. uid "-1" is zca-js's
+    // sentinel for an @all/@everyone tag (see zca-js sendMessage.js:
+    // `type: m.uid == "-1" ? 1 : 0`). Only meaningful for group chats;
+    // zca-js itself drops mentions for non-group threads.
+    const messageContent = Array.isArray(mentions) && mentions.length > 0
+      ? { msg: text, mentions }
+      : { msg: text };
     const result = await enqueueSend(() =>
-      withTimeout(api.sendMessage({ msg: text }, parsed.threadId, parsed.threadType)),
+      withTimeout(api.sendMessage(messageContent, parsed.threadId, parsed.threadType)),
     );
     res.json({ success: true, message_id: result?.message?.msgId ?? null });
   } catch (err) {

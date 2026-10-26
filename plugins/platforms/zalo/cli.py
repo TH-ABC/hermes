@@ -37,7 +37,10 @@ from .adapter import (
     _kill_stale_bridge_by_pidfile,
     check_zalo_requirements,
     resolve_zalo_bridge_dir,
+    save_zalo_extra_value,
 )
+
+_LEGACY_ACCESS_ENV_VARS = ("ZALO_ALLOWED_USERS", "ZALO_ALLOW_ALL_USERS")
 
 _PAIR_TIMEOUT_SECONDS = 120
 
@@ -252,23 +255,48 @@ def _cmd_setup(args) -> int:
                        "gating will fall back to name matching only.")
 
     print_header("Configuration")
-    allowed_users = prompt(
-        "Zalo user IDs allowed to use the bot (comma-separated, blank = configure later)",
+    owner_id = prompt(
+        "YOUR Zalo user ID (the owner) — the only account allowed to DM this "
+        "bot and run !moquyenchat/!dongquyenchat/!promptcapnhat (blank = "
+        "configure later, but DMs and those commands stay unusable until set)",
+        default="",
+    )
+    group_allow_from = prompt(
+        "Zalo user IDs allowed to talk to the bot in groups NOT opened via "
+        "!moquyenchat (comma-separated, blank = none until a group is opened)",
         default="",
     )
     home_channel = prompt(
         "Default chat ID for reminders/cron delivery (e.g. u:123... or g:456..., blank = skip)",
         default="",
     )
+    disable_dms = prompt_yes_no(
+        "Disable direct messages entirely (blocks even the owner)?",
+        default=False,
+    )
     require_mention = prompt_yes_no(
-        "Require @mention before the bot responds in group chats? (DMs always respond)",
+        "Require @mention before the bot responds in group chats?",
         default=True,
     )
 
-    if allowed_users.strip():
-        save_env_value("ZALO_ALLOWED_USERS", allowed_users.strip())
+    if owner_id.strip():
+        save_zalo_extra_value("owner_id", owner_id.strip())
+    else:
+        print_warning(
+            "No owner set — DMs are blocked for everyone and "
+            "!moquyenchat/!dongquyenchat/!promptcapnhat are unusable until "
+            "you run `hermes zalo owner <uid>` or set "
+            "platforms.zalo.extra.owner_id in config.yaml."
+        )
+    if group_allow_from.strip():
+        save_zalo_extra_value(
+            "group_allow_from",
+            [v.strip() for v in group_allow_from.split(",") if v.strip()],
+        )
     if home_channel.strip():
         save_env_value("ZALO_HOME_CHANNEL", home_channel.strip())
+    save_zalo_extra_value("disable_dms", disable_dms)
+    save_env_value("ZALO_DISABLE_DMS", "true" if disable_dms else "false")
     save_env_value("ZALO_REQUIRE_MENTION", "true" if require_mention else "false")
     save_env_value("ZALO_ENABLED", "true")
     try:
@@ -276,8 +304,39 @@ def _cmd_setup(args) -> int:
     except Exception:
         pass  # config.yaml is optional — env vars alone are sufficient to enable
 
+    stale = [n for n in _LEGACY_ACCESS_ENV_VARS if (os.getenv(n) or "").strip()]
+    if stale and prompt_yes_no(
+        f"{'/'.join(stale)} is still set from before this owner/group model — it "
+        "DISABLES the settings above for all Zalo chats. Clear it now?",
+        default=True,
+    ):
+        for name in stale:
+            save_env_value(name, "")
+        print_success(f"Cleared {', '.join(stale)}.")
+
     print_success("Zalo is paired and enabled.")
     print_info("Start (or restart) the gateway to bring the bot online: `hermes gateway`")
+    return 0
+
+
+def _zalo_extra_config() -> dict:
+    """Read the live ``platforms.zalo.extra`` dict from config.yaml."""
+    from hermes_cli.config import read_raw_config
+
+    zalo_cfg = ((read_raw_config().get("platforms") or {}).get("zalo") or {})
+    extra = zalo_cfg.get("extra")
+    return extra if isinstance(extra, dict) else {}
+
+
+def _cmd_owner(args) -> int:
+    print_header("Zalo Owner")
+    uid = str(getattr(args, "uid", "") or "").strip()
+    if not uid:
+        current = str(_zalo_extra_config().get("owner_id") or "").strip()
+        print_info(f"Current owner: {current or '(not set)'}")
+        return 0
+    save_zalo_extra_value("owner_id", uid)
+    print_success(f"Owner set to {uid}. Restart the gateway to apply.")
     return 0
 
 
@@ -321,6 +380,23 @@ def _cmd_status(args) -> int:
 
     enabled = (os.getenv("ZALO_ENABLED") or "").strip().lower() in {"true", "1", "yes"}
     print_success("ZALO_ENABLED=true") if enabled else print_warning("ZALO_ENABLED is not set to true")
+
+    extra = _zalo_extra_config()
+    owner_id = str(extra.get("owner_id") or "").strip()
+    print_success(f"Owner: {owner_id}") if owner_id else print_warning(
+        "No owner configured — DMs and !moquyenchat/!dongquyenchat/!promptcapnhat "
+        "are unusable. Run `hermes zalo owner <uid>`."
+    )
+    groups = extra.get("groups")
+    opened = list(groups.keys()) if isinstance(groups, dict) else []
+    print_info(f"Opened groups (!moquyenchat): {', '.join(opened) if opened else '(none)'}")
+
+    stale = [n for n in _LEGACY_ACCESS_ENV_VARS if (os.getenv(n) or "").strip()]
+    if stale:
+        print_warning(
+            f"{'/'.join(stale)} is set — this DISABLES the owner/group policy "
+            "above for ALL Zalo chats. Clear it in .env and restart."
+        )
     return 0
 
 
@@ -358,6 +434,10 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     sub.add_parser("setup", help="Pair a Zalo account via QR code and configure the bot")
     sub.add_parser("status", help="Show Zalo pairing and bridge status")
     sub.add_parser("logout", help="Unpair the Zalo account and remove stored credentials")
+    owner_parser = sub.add_parser(
+        "owner", help="Show or set the bot owner uid, without re-pairing"
+    )
+    owner_parser.add_argument("uid", nargs="?", default="", help="Zalo uid to set as owner")
 
 
 def dispatch(args) -> int:
@@ -368,6 +448,8 @@ def dispatch(args) -> int:
         return _cmd_status(args)
     if command == "logout":
         return _cmd_logout(args)
+    if command == "owner":
+        return _cmd_owner(args)
     print_error(f"Unknown zalo command: {command}")
     return 1
 
