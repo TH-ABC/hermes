@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MuseAI Dashboard</title>
+<style>
+:root{
+  --bg:#f6f7f9;--panel:#fff;--panel2:#f1f3f6;--line:#e3e6eb;--text:#161a20;--muted:#68707d;
+  --accent:#4f46e5;--accent-soft:#eceafd;--ok:#16a34a;--ok-soft:#dcfce7;--warn:#d97706;--warn-soft:#fef3c7;
+  --bad:#dc2626;--bad-soft:#fee2e2;--video:#4f46e5;--image:#0891b2;--fail:#dc2626;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1115;--panel:#171a21;--panel2:#1f232c;--line:#2a2f3a;--text:#e7e9ee;--muted:#9099a8;
+  --accent:#818cf8;--accent-soft:#272a4a;--ok:#4ade80;--ok-soft:#14321f;--warn:#fbbf24;--warn-soft:#3a2e10;
+  --bad:#f87171;--bad-soft:#3b1717;--video:#818cf8;--image:#22d3ee;--fail:#f87171;--shadow:none;}}
+:root[data-theme="dark"]{
+  --bg:#0f1115;--panel:#171a21;--panel2:#1f232c;--line:#2a2f3a;--text:#e7e9ee;--muted:#9099a8;
+  --accent:#818cf8;--accent-soft:#272a4a;--ok:#4ade80;--ok-soft:#14321f;--warn:#fbbf24;--warn-soft:#3a2e10;
+  --bad:#f87171;--bad-soft:#3b1717;--video:#818cf8;--image:#22d3ee;--fail:#f87171;--shadow:none;}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+.brand small{font-weight:500;color:var(--muted);margin-left:6px}
+.tabs{display:flex;gap:4px;margin-left:8px}
+.tab{border:0;background:none;padding:7px 12px;border-radius:8px;color:var(--muted);font-weight:600}
+.tab[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--panel2);color:var(--muted);font-size:12px;font-weight:600;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
+.iconbtn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 9px;color:var(--muted)}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 14px;font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.sm{padding:4px 10px;font-size:12px}
+main{display:none}
+main.active{display:block}
+.wrap{max-width:1280px;margin:0 auto;padding:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.card h3{margin:0;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.card .hd{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.card .bd{padding:14px 16px}
+.muted{color:var(--muted)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+input[type=text],input[type=password],select,textarea{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;outline:none;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--panel2);color:var(--muted)}
+.badge.ready,.badge.ok{background:var(--ok-soft);color:var(--ok)}
+.badge.starting,.badge.not_ready,.badge.cooldown{background:var(--warn-soft);color:var(--warn)}
+.badge.expired,.badge.error,.badge.fail{background:var(--bad-soft);color:var(--bad)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+
+/* ---------- chat ---------- */
+#chat.active{display:flex}
+#chat{height:calc(100vh - 53px)}
+.side{width:260px;flex:none;border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column}
+.side .new{margin:12px}
+.convs{flex:1;overflow-y:auto;padding:0 8px 12px}
+.conv{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--muted)}
+.conv:hover{background:var(--panel2)}
+.conv.on{background:var(--accent-soft);color:var(--text)}
+.conv .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv .x{border:0;background:none;color:var(--muted);opacity:0;padding:0 4px}
+.conv:hover .x{opacity:1}
+.chatmain{flex:1;display:flex;flex-direction:column;min-width:0}
+.msgs{flex:1;overflow-y:auto;padding:20px 16px}
+.msgs-in{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.msg{display:flex;flex-direction:column;gap:6px;max-width:100%}
+.msg.user{align-items:flex-end}
+.bubble{padding:10px 14px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word;max-width:min(680px,100%)}
+.msg.user .bubble{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.bot .bubble{background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.bot.err .bubble{border-color:var(--bad);background:var(--bad-soft)}
+.meta{font-size:12px;color:var(--muted)}
+.media{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;width:min(680px,100%)}
+.media video,.media img{width:100%;border-radius:10px;background:#000;display:block}
+.media a.dl{font-size:12px}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.thumbs img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.empty{margin:auto;text-align:center;color:var(--muted);padding:40px 16px}
+.empty h2{color:var(--text);margin:0 0 6px;font-size:20px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:16px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font-size:13px}
+.composer{border-top:1px solid var(--line);background:var(--panel);padding:10px 16px 14px}
+.composer-in{max-width:860px;margin:0 auto}
+.opts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--muted)}
+.opts select{width:auto;padding:3px 8px;font-size:12px}
+.box{display:flex;gap:8px;align-items:flex-end;border:1px solid var(--line);border-radius:12px;padding:6px;background:var(--panel)}
+.box:focus-within{border-color:var(--accent)}
+.box textarea{border:0;resize:none;max-height:200px;min-height:40px;padding:8px}
+.attach{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.att{position:relative}
+.att img{width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.att button{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;border:0;background:var(--text);color:var(--bg);font-size:11px;line-height:18px;padding:0}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ---------- monitor ---------- */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:12px}
+.kpi{padding:14px 16px}
+.kpi .l{font-size:12px;color:var(--muted);font-weight:600}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi .s{font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px}
+.grid11{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-left:auto}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+#chart{width:100%;height:220px;display:block}
+#chart text{fill:var(--muted);font-size:10px}
+.tip{position:fixed;pointer-events:none;background:var(--text);color:var(--bg);padding:6px 9px;border-radius:6px;font-size:12px;display:none;z-index:20;white-space:nowrap}
+.meter{margin-bottom:12px}
+.meter .row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.bar{height:8px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.bar>i.hot{background:var(--warn)}.bar>i.crit{background:var(--bad)}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.gallery a{position:relative;display:block;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--panel2)}
+.gallery img,.gallery video{width:100%;height:100%;object-fit:cover;display:block}
+.gallery .tag{position:absolute;left:6px;top:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:1px 6px;border-radius:4px}
+.logs{max-height:320px;overflow:auto;background:var(--panel2);border-radius:8px;padding:10px;white-space:pre-wrap;margin:0}
+.ev-prompt{max-width:380px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--panel);padding:3px 10px;font-size:12px;color:var(--muted)}
+.seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+/* ---------- accounts ---------- */
+.accgrid{display:grid;grid-template-columns:420px 1fr;gap:12px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.hint{font-size:12px;color:var(--muted);background:var(--panel2);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+.hint ol{margin:4px 0 0;padding-left:18px}
+.msgline{font-size:13px;margin-top:8px;min-height:20px}
+.msgline.ok{color:var(--ok)}.msgline.bad{color:var(--bad)}
+
+/* ---------- login ---------- */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:30;padding:16px}
+.modal.on{display:flex}
+.modal .card{width:min(420px,100%);padding:22px}
+.modal h2{margin:0 0 4px;font-size:18px}
+
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.grid2,.grid11,.accgrid{grid-template-columns:1fr}}
+@media (max-width:760px){
+  .side{display:none}.side.open{display:flex;position:fixed;inset:53px 0 0 0;width:auto;z-index:4}
+  .kpis{grid-template-columns:repeat(2,1fr)}.brand small{display:none}.tab{padding:6px 8px}
+  #sideToggle{display:inline-block!important}.top{gap:6px;padding:10px 12px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <button class="iconbtn" id="sideToggle" style="display:none" aria-label="Danh sách hội thoại">☰</button>
+  <div class="brand">MuseAI<small>Bridge Pool</small></div>
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="chat" aria-selected="true">Chat</button>
+    <button class="tab" role="tab" data-tab="monitor" aria-selected="false">Monitor</button>
+    <button class="tab" role="tab" data-tab="accounts" aria-selected="false">Tài khoản</button>
+  </nav>
+  <div class="spacer"></div>
+  <span class="pill" id="health"><span class="dot"></span><span>…</span></span>
+  <button class="iconbtn" id="themeBtn" title="Đổi giao diện sáng/tối">◐</button>
+  <button class="iconbtn" id="logoutBtn" title="Đổi API key">⎋</button>
+</header>
+
+<!-- ============================ CHAT ============================ -->
+<main id="chat" class="active">
+  <aside class="side" id="side">
+    <button class="btn primary new" id="newConv">+ Cuộc trò chuyện mới</button>
+    <div class="convs" id="convs"></div>
+  </aside>
+  <section class="chatmain">
+    <div class="msgs" id="msgs"><div class="msgs-in" id="msgsIn"></div></div>
+    <div class="composer">
+      <div class="composer-in">
+        <div class="opts">
+          <label>Tài khoản <select id="accSel"><option value="">Tự động</option></select></label>
+          <label>Chờ tối đa <select id="timeoutSel">
+            <option value="180000">3 phút (chat/ảnh)</option>
+            <option value="480000" selected>8 phút (video)</option>
+            <option value="900000">15 phút</option>
+          </select></label>
+          <span id="convAcc"></span>
+        </div>
+        <div class="attach" id="attach"></div>
+        <div class="box">
+          <button class="iconbtn" id="attachBtn" title="Đính kèm ảnh/video" style="border:0">📎</button>
+          <input type="file" id="fileIn" accept="image/*,video/mp4" multiple hidden>
+          <textarea id="prompt" rows="1" placeholder="Nhập prompt… (Enter để gửi, Shift+Enter xuống dòng, dán ảnh trực tiếp)"></textarea>
+          <button class="btn primary" id="sendBtn">Gửi</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============================ MONITOR ============================ -->
+<main id="monitor">
+  <div class="wrap">
+    <div class="kpis">
+      <div class="card kpi"><div class="l">Video đã tạo</div><div class="v" id="kVideos">–</div><div class="s" id="kVideosS"></div></div>
+      <div class="card kpi"><div class="l">Ảnh đã tạo</div><div class="v" id="kImages">–</div><div class="s" id="kImagesS"></div></div>
+      <div class="card kpi"><div class="l">Lượt chat / request</div><div class="v" id="kReq">–</div><div class="s" id="kReqS"></div></div>
+      <div class="card kpi"><div class="l">Tỉ lệ thành công</div><div class="v" id="kRate">–</div><div class="s" id="kRateS"></div></div>
+      <div class="card kpi"><div class="l">Tài khoản sẵn sàng</div><div class="v" id="kAcc">–</div><div class="s" id="kAccS"></div></div>
+      <div class="card kpi"><div class="l">Đang xử lý</div><div class="v" id="kActive">–</div><div class="s" id="kActiveS"></div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="hd"><h3>Hoạt động 48 giờ qua</h3>
+          <div class="legend"><span><i style="background:var(--video)"></i>Video</span><span><i style="background:var(--image)"></i>Ảnh</span><span><i style="background:var(--fail)"></i>Lỗi</span></div>
+        </div>
+        <div class="bd"><svg id="chart" role="img" aria-label="Biểu đồ hoạt động theo giờ"></svg></div>
+      </div>
+      <div class="card">
+        <div class="hd"><h3>Máy chủ</h3><span class="spacer"></span><span class="muted mono" id="uptime"></span></div>
+        <div class="bd" id="sys"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="hd"><h3>Tài khoản</h3></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Tài khoản</th><th>Trạng thái</th><th class="num">Đang chạy</th><th class="num">Request</th><th class="num">Thành công</th><th class="num">Lỗi</th><th class="num">Video</th><th class="num">Ảnh</th><th>Kiểm tra lần cuối</th></tr></thead>
+        <tbody id="accTable"></tbody>
+      </table></div>
+    </div>
+
+    <div class="grid11">
+      <div class="card">
+        <div class="hd"><h3>Sự kiện gần đây</h3></div>
+        <div class="tablewrap" style="max-height:420px;overflow-y:auto"><table>
+          <thead><tr><th>Lúc</th><th>Loại</th><th>TK</th><th>Kết quả</th><th>Prompt</th></tr></thead>
+          <tbody id="events"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <div class="hd"><h3>Batch jobs</h3><span class="spacer"></span><span class="muted" id="batchSum"></span></div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Batch</th><th>Trạng thái</th><th class="num">Xong</th><th class="num">Lỗi</th><th class="num">Tổng</th><th>Tạo lúc</th></tr></thead>
+          <tbody id="batches"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="hd"><h3>Media đã lưu</h3><span class="muted" id="mediaSum"></span><span class="spacer"></span>
+        <div class="seg" id="mediaSeg"><button data-t="" class="on">Tất cả</button><button data-t="video">Video</button><button data-t="image">Ảnh</button></div>
+      </div>
+      <div class="bd"><div class="gallery" id="gallery"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><h3>Log máy chủ</h3><span class="spacer"></span><label class="muted" style="font-size:12px"><input type="checkbox" id="logFollow" checked> Tự cuộn</label></div>
+      <div class="bd"><pre class="logs mono" id="logs"></pre></div>
+    </div>
+  </div>
+</main>
+
+<!-- ============================ ACCOUNTS ============================ -->
+<main id="accounts">
+  <div class="wrap"><div class="card" id="expBanner" style="display:none;border-color:#e5484d;margin-bottom:16px">
+    <div class="bd" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <b style="color:#e5484d" id="expText"></b><span class="spacer"></span>
+      <span class="muted" style="font-size:12px" id="tgState"></span>
+      <button class="btn sm" id="tgTest">Gửi thử Telegram</button>
+    </div></div></div>
+  <div class="wrap" style="margin-bottom:14px">
+    <div class="card" style="border:1.5px solid var(--accent);box-shadow:0 2px 8px rgba(79,70,229,.12)">
+      <div class="hd" style="background:var(--accent-soft);display:flex;align-items:center;gap:8px">
+        <h3 style="color:var(--accent);font-size:14px;letter-spacing:0">⚡ Tự động nạp Mail | Password (Lấy OTP & Trích xuất Cookie)</h3>
+        <span class="spacer"></span>
+        <span class="pill" style="font-size:11px;background:var(--panel)"><i class="dot ok"></i> Auto OTP & Login</span>
+      </div>
+      <div class="bd">
+        <div class="hint" style="margin-bottom:10px">
+          <b>Tự động 100%:</b> Dán danh sách tài khoản Hotmail (mỗi dòng 1 tài khoản). Hệ thống sẽ tự mở phiên đăng nhập, lấy mã xác nhận OTP từ Microsoft, đăng nhập Muse.ai và nạp thẳng Cookie vào Pool.
+          <br>Hỗ trợ định dạng: <span class="mono">mail | password</span> hoặc <span class="mono">mail|pass|refreshToken|client_id</span>.
+        </div>
+        <div class="field">
+          <label for="autoAccInput" style="display:flex;justify-content:space-between">
+            <span>Danh sách tài khoản (mỗi dòng 1 tài khoản)</span>
+            <span class="muted" id="autoAccCount">0 tài khoản</span>
+          </label>
+          <textarea id="autoAccInput" rows="4" class="mono" placeholder="user1@hotmail.com|password123&#10;user2@hotmail.com|password456|refreshToken|client_id" style="font-size:12px"></textarea>
+        </div>
+        <div class="field" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="sheetUrl" placeholder="Hoặc dán link Google Sheet (cột: email | password | refreshToken | client_id)" style="flex:1;min-width:240px;font-size:12px">
+          <button class="btn" id="btnSheet">Tải từ Google Sheet</button>
+          <span class="muted" id="sheetMsg" style="font-size:12px"></span>
+        </div>
+        <div class="field" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:0">
+          <label class="muted" style="font-size:13px;margin:0"><input type="checkbox" id="autoAccSkip" checked> Bỏ qua tài khoản đang hoạt động (chỉ chạy lại khi expired)</label>
+          <label class="muted" style="font-size:13px;margin:0"><input type="checkbox" id="autoAccOverwrite" checked> Ghi đè tài khoản đã có (để cập nhật lại cookie mới nếu hết hạn)</label>
+          <span class="spacer"></span>
+          <button class="btn primary" id="btnStartAutoAcc" style="padding:8px 18px;font-size:13px">⚡ Bắt đầu đăng nhập & Nạp vào Pool</button>
+          <button class="btn" id="btnStartLocalAcc" style="padding:8px 18px;font-size:13px" title="Chạy Chrome trên máy bạn, bạn tự giải captcha. Cần chạy: python3 tools/local_login_server.py">🖥️ Đăng nhập local (tự giải captcha)</button>
+        </div>
+        <div id="autoAccProgress" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span id="autoAccStatus" style="font-weight:600;color:var(--accent)">Đang chuẩn bị...</span>
+            <span id="autoAccRatio" class="mono muted">0/0</span>
+          </div>
+          <div style="background:var(--panel2);height:6px;border-radius:3px;overflow:hidden;border:1px solid var(--line)">
+            <div id="autoAccBar" style="background:var(--accent);height:100%;width:0%;transition:width .3s"></div>
+          </div>
+          <pre id="autoAccLogs" class="mono" style="margin-top:8px;padding:8px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;max-height:160px;overflow-y:auto;font-size:11px;white-space:pre-wrap;line-height:1.6"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap accgrid">
+    <div class="card">
+      <div class="hd"><h3>Thêm tài khoản</h3></div>
+      <div class="bd">
+        <div class="hint">
+          <b>Cách lấy cookie</b>
+          <ol>
+            <li>Đăng nhập <a href="https://muse.ai" target="_blank" rel="noopener">muse.ai</a> trên Chrome.</li>
+            <li>Mở extension <b>Cookie-Editor</b> → <b>Export</b> → <b>JSON</b>.</li>
+            <li>Dán vào ô bên dưới (hoặc chọn file .json). Chuỗi header <span class="mono">name=value; …</span> cũng được.</li>
+          </ol>
+          Cookie bắt buộc phải có <span class="mono">hatch_sess</span>.
+        </div>
+        <div class="field"><label for="accName">Tên tài khoản</label><input type="text" id="accName" placeholder="vd: acc02" maxlength="40" autocomplete="off"></div>
+        <div class="field"><label for="accCookies">Cookie</label><textarea id="accCookies" rows="9" class="mono" placeholder='[{"name":"hatch_sess","value":"…","domain":".muse.ai"}, …]'></textarea></div>
+        <div class="field" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label class="btn sm" style="margin:0">Chọn file .json<input type="file" id="accFile" accept=".json,.txt,application/json,text/plain" hidden></label>
+          <label class="muted" style="font-size:13px;margin:0"><input type="checkbox" id="accOverwrite"> Ghi đè nếu đã có (cập nhật cookie)</label>
+        </div>
+        <button class="btn primary" id="accAdd">Thêm tài khoản</button>
+        <div class="msgline" id="accMsg"></div>
+      </div>
+      <div class="hd"><h3>Thêm hàng loạt</h3></div>
+      <div class="bd">
+        <div class="hint">Chọn <b>nhiều file .json</b> cùng lúc (tên file = tên tài khoản), hoặc dán một JSON dạng
+          <span class="mono">{"acc01": [cookies…], "acc02": [cookies…]}</span>. Tối đa 200 tài khoản/lần.</div>
+        <div class="field" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label class="btn sm" style="margin:0">Chọn nhiều file .json<input type="file" id="bulkFiles" accept=".json,.txt,application/json,text/plain" multiple hidden></label>
+          <span class="muted" id="bulkPicked" style="font-size:13px"></span>
+        </div>
+        <div class="field"><textarea id="bulkJson" rows="5" class="mono" placeholder='{"acc01": [...], "acc02": [...]}'></textarea></div>
+        <label class="muted" style="font-size:13px"><input type="checkbox" id="bulkOverwrite"> Ghi đè tài khoản đã có (cập nhật cookie hết hạn)</label>
+        <div><button class="btn primary" id="bulkAdd">Thêm hàng loạt</button></div>
+        <div class="msgline" id="bulkMsg"></div>
+        <div class="tablewrap"><table><tbody id="bulkResult"></tbody></table></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="hd"><h3>Danh sách tài khoản</h3><span class="spacer"></span>
+        <button class="btn sm" id="accSort" title="Đưa tài khoản đang hoạt động lên đầu">Sắp xếp: mặc định</button>
+        <button class="btn sm" id="accCheckAll">Kiểm tra tất cả</button>
+        <button class="btn sm" id="accReload">Quét lại thư mục</button>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Tài khoản</th><th>Trạng thái</th><th class="num">Song song</th><th class="num">Xong / Lỗi</th><th>Kiểm tra lúc</th><th>Ghi chú</th><th></th></tr></thead>
+        <tbody id="accList"></tbody>
+      </table></div>
+      <div class="bd muted" style="font-size:12px">Pool tự kiểm tra phiên mỗi 10 phút. Tài khoản <span class="badge expired">expired</span> cần dán cookie mới (tick “Ghi đè”).</div>
+    </div>
+  </div>
+</main>
+
+<div class="modal" id="login">
+  <div class="card">
+    <h2>Đăng nhập dashboard</h2>
+    <p class="muted" style="margin:0 0 14px">Nhập API key của bridge (<span class="mono">MUSE_API_KEY</span> trong <span class="mono">/etc/musebridge.env</span>).</p>
+    <input type="password" id="keyIn" placeholder="API key" autocomplete="current-password">
+    <div class="msgline bad" id="loginMsg"></div>
+    <button class="btn primary" id="keyBtn" style="width:100%;margin-top:6px">Vào dashboard</button>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+(() => {
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => (n ?? 0).toLocaleString("vi-VN");
+const bytes = b => { if (!b) return "0 B"; const u = ["B","KB","MB","GB","TB"]; const i = Math.min(Math.floor(Math.log(b)/Math.log(1024)), 4); return (b/1024**i).toFixed(i ? 1 : 0) + " " + u[i]; };
+const ago = ts => { if (!ts) return "–"; const s = Math.round(Date.now()/1000 - ts); if (s < 60) return s + " giây trước"; if (s < 3600) return Math.round(s/60) + " phút trước"; if (s < 86400) return Math.round(s/3600) + " giờ trước"; return Math.round(s/86400) + " ngày trước"; };
+const clock = ts => new Date(ts*1000).toLocaleString("vi-VN", {hour:"2-digit", minute:"2-digit", day:"2-digit", month:"2-digit"});
+const dur = s => { s = Math.round(s); const d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60); return (d ? d+"d " : "") + (h ? h+"h " : "") + m + "m"; };
+
+// ---------------------------------------------------------------- theme
+const applyTheme = t => { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
+applyTheme(store.get("museTheme", null));
+$("#themeBtn").onclick = () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark"; applyTheme(next); store.set("museTheme", next); if (lastStats) drawChart(lastStats.hourly);
+};
+
+// ---------------------------------------------------------------- api
+let KEY = store.get("museKey", "");
+const hashKey = new URLSearchParams(location.hash.slice(1)).get("key");
+if (hashKey) { KEY = hashKey; store.set("museKey", KEY); history.replaceState(null, "", location.pathname); }
+async function api(path, opts = {}) {
+  const headers = Object.assign({"X-API-Key": KEY}, opts.body ? {"Content-Type": "application/json"} : {}, opts.headers || {});
+  const r = await fetch(path, Object.assign({}, opts, {headers}));
+  if (r.status === 401) { showLogin("API key không đúng hoặc đã đổi."); throw new Error("unauthorized"); }
+  let j; try { j = await r.json(); } catch { j = {ok: false, error: "HTTP " + r.status}; }
+  return j;
+}
+const mediaUrl = u => (KEY && u.startsWith("/media/")) ? u + (u.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(KEY) : u;
+function showLogin(msg) { $("#loginMsg").textContent = msg || ""; $("#login").classList.add("on"); setTimeout(() => $("#keyIn").focus(), 50); }
+$("#keyBtn").onclick = async () => {
+  KEY = $("#keyIn").value.trim(); if (!KEY) return;
+  const r = await fetch("/v1/status", {headers: {"X-API-Key": KEY}});
+  if (r.status === 401) { $("#loginMsg").textContent = "Sai API key."; return; }
+  store.set("museKey", KEY); $("#login").classList.remove("on"); refreshAll();
+};
+$("#keyIn").addEventListener("keydown", e => { if (e.key === "Enter") $("#keyBtn").click(); });
+$("#logoutBtn").onclick = async () => { store.del("museKey"); KEY = ""; try { await fetch("/dashboard/logout", {method: "POST"}); } catch {} location.replace("/dashboard"); };
+
+// ---------------------------------------------------------------- tabs
+let tab = store.get("museTab", "chat");
+function setTab(t) {
+  tab = t; store.set("museTab", t);
+  $$(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
+  $$("main").forEach(m => m.classList.toggle("active", m.id === t));
+  $("#sideToggle").style.visibility = t === "chat" ? "visible" : "hidden";
+  refreshAll();
+}
+$$(".tab").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+$("#sideToggle").onclick = () => $("#side").classList.toggle("open");
+
+// ---------------------------------------------------------------- status (shared)
+let status = null;
+async function refreshStatus() {
+  status = await api("/v1/status");
+  const ready = status.accounts_ready || 0, total = status.accounts_total || 0;
+  const cls = ready ? (ready < total ? "warn" : "ok") : "bad";
+  $("#health").innerHTML = `<span class="dot ${cls}"></span><span>${ready}/${total} tài khoản · ${status.capacity || 0} luồng</span>`;
+  const sel = $("#accSel"), cur = sel.value;
+  sel.innerHTML = `<option value="">Tự động</option>` + (status.accounts || []).map(a =>
+    `<option value="${esc(a.name)}" ${a.status !== "ready" ? "disabled" : ""}>${esc(a.name)}${a.status !== "ready" ? " (" + esc(a.status) + ")" : ""}</option>`).join("");
+  sel.value = cur;
+  return status;
+}
+
+// ================================================================= CHAT
+let convs = store.get("museConvs", []);
+let curId = store.get("museCur", null);
+let pending = [];          // attachments: {name, data}
+let sending = false;
+const saveConvs = () => { store.set("museConvs", convs.slice(0, 60)); store.set("museCur", curId); };
+const cur = () => convs.find(c => c.id === curId);
+
+function renderConvs() {
+  $("#convs").innerHTML = convs.map(c => `<div class="conv ${c.id === curId ? "on" : ""}" data-id="${c.id}">
+    <span class="t">${esc(c.title || "Cuộc trò chuyện mới")}</span><button class="x" data-del="${c.id}" title="Xoá">✕</button></div>`).join("")
+    || `<div class="muted" style="padding:10px;font-size:13px">Chưa có cuộc trò chuyện.</div>`;
+  $$(".conv").forEach(el => el.onclick = e => {
+    if (e.target.dataset.del) { convs = convs.filter(c => c.id !== e.target.dataset.del); if (curId === e.target.dataset.del) curId = null; saveConvs(); renderConvs(); renderMsgs(); return; }
+    curId = el.dataset.id; saveConvs(); renderConvs(); renderMsgs(); $("#side").classList.remove("open");
+  });
+}
+
+function mediaHtml(list) {
+  if (!list || !list.length) return "";
+  return `<div class="media">` + list.map(u => {
+    const src = esc(mediaUrl(u)), isVid = /\.(mp4|webm|mov)(\?|$)/i.test(u);
+    return `<div>${isVid ? `<video src="${src}" controls playsinline preload="metadata"></video>` : `<a href="${src}" target="_blank" rel="noopener"><img src="${src}" loading="lazy" alt="Ảnh tạo bởi Muse"></a>`}
+      <a class="dl" href="${src}" download>Tải về</a></div>`;
+  }).join("") + `</div>`;
+}
+
+function renderMsgs() {
+  const c = cur(), box = $("#msgsIn");
+  $("#convAcc").textContent = c && c.account ? `· hội thoại đang gắn với tài khoản ${c.account}` : "";
+  if (!c || !c.messages.length) {
+    box.innerHTML = `<div class="empty"><h2>Chat với Muse</h2>
+      <div>Tạo video TVC, ảnh, hoặc hỏi đáp. Đính kèm ảnh sản phẩm để làm tư liệu.</div>
+      <div class="chips">
+        <button class="chip" data-p="Tạo video 8 giây quay cận cảnh ly cà phê sữa đá, ánh sáng buổi sáng, camera dolly-in chậm">🎬 Video cà phê</button>
+        <button class="chip" data-p="Tạo 1 ảnh poster quảng cáo tối giản cho sản phẩm trong ảnh đính kèm, nền pastel">🖼️ Poster sản phẩm</button>
+        <button class="chip" data-p="Viết kịch bản TVC 15 giây cho một thương hiệu nước mắm, chia theo từng shot">✍️ Kịch bản TVC</button>
+      </div></div>`;
+    $$(".chip", box).forEach(b => b.onclick = () => { $("#prompt").value = b.dataset.p; autosize(); $("#prompt").focus(); });
+    return;
+  }
+  box.innerHTML = c.messages.map(m => {
+    if (m.role === "user") return `<div class="msg user">${m.thumbs && m.thumbs.length ? `<div class="thumbs">${m.thumbs.map(t => `<img src="${t}" alt="">`).join("")}</div>` : ""}
+      ${m.text ? `<div class="bubble">${esc(m.text)}</div>` : ""}<div class="meta">${clock(m.ts)}</div></div>`;
+    if (m.pending) return `<div class="msg bot"><div class="bubble"><span class="spin"></span> <span class="muted">Muse đang xử lý… <span data-elapsed="${m.ts}"></span></span></div></div>`;
+    return `<div class="msg bot ${m.ok === false ? "err" : ""}">
+      ${m.text ? `<div class="bubble">${esc(m.text)}</div>` : ""}${mediaHtml(m.media)}
+      <div class="meta">${clock(m.ts)}${m.account ? " · " + esc(m.account) : ""}${m.duration ? " · " + Math.round(m.duration/1000) + " giây" : ""}${m.ok === false && m.error ? " · " + esc(m.error) : ""}</div></div>`;
+  }).join("");
+  const sc = $("#msgs"); sc.scrollTop = sc.scrollHeight;
+}
+setInterval(() => $$("[data-elapsed]").forEach(el => el.textContent = Math.round(Date.now()/1000 - +el.dataset.elapsed) + "s"), 1000);
+
+function renderAttach() {
+  $("#attach").innerHTML = pending.map((p, i) => `<div class="att">${p.data.startsWith("data:image") ? `<img src="${p.data}" alt="">` : `<span class="pill">${esc(p.name)}</span>`}<button data-i="${i}" aria-label="Bỏ">✕</button></div>`).join("");
+  $$("#attach button").forEach(b => b.onclick = () => { pending.splice(+b.dataset.i, 1); renderAttach(); });
+}
+const readFile = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f); });
+async function addFiles(files) {
+  for (const f of files) { if (pending.length >= 10) break; pending.push({name: f.name || "paste.png", data: await readFile(f)}); }
+  renderAttach();
+}
+$("#attachBtn").onclick = () => $("#fileIn").click();
+$("#fileIn").onchange = e => { addFiles([...e.target.files]); e.target.value = ""; };
+$("#prompt").addEventListener("paste", e => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); addFiles(fs); } });
+const autosize = () => { const t = $("#prompt"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 200) + "px"; };
+$("#prompt").addEventListener("input", autosize);
+$("#prompt").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
+$("#sendBtn").onclick = send;
+$("#newConv").onclick = () => { curId = null; saveConvs(); renderConvs(); renderMsgs(); $("#side").classList.remove("open"); $("#prompt").focus(); };
+
+async function thumb(data) {
+  if (!data.startsWith("data:image")) return null;
+  return new Promise(ok => { const img = new Image(); img.onload = () => { const c = document.createElement("canvas"), s = 128 / Math.max(img.width, img.height);
+    c.width = img.width * s; c.height = img.height * s; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", .7)); }; img.onerror = () => ok(null); img.src = data; });
+}
+
+async function send() {
+  const text = $("#prompt").value.trim();
+  if (sending || (!text && !pending.length)) return;
+  let c = cur();
+  if (!c) { c = {id: "c" + Date.now(), title: (text || "Ảnh đính kèm").slice(0, 60), account: null, messages: []}; convs.unshift(c); curId = c.id; }
+  const files = pending.slice(); pending = []; renderAttach();
+  const thumbs = (await Promise.all(files.map(f => thumb(f.data)))).filter(Boolean);
+  const isFirst = !c.messages.some(m => m.role === "bot" && m.ok !== false);
+  c.messages.push({role: "user", text, thumbs, ts: Date.now()/1000});
+  const wait = {role: "bot", pending: true, ts: Date.now()/1000}; c.messages.push(wait);
+  $("#prompt").value = ""; autosize(); sending = true; $("#sendBtn").disabled = true;
+  saveConvs(); renderConvs(); renderMsgs();
+  const account = c.account || $("#accSel").value || undefined;
+  const body = {prompt: text, files: files.map(f => f.data), timeout_ms: +$("#timeoutSel").value, new_thread: isFirst};
+  if (account) body.account = account;
+  try {
+    const r = await api("/v1/chat", {method: "POST", body: JSON.stringify(body)});
+    Object.assign(wait, {pending: false, ok: r.ok !== false, text: r.content || (r.ok === false ? "" : "(không có nội dung)"), media: r.media || [],
+      account: r.account, duration: r.duration_ms, error: r.error, ts: Date.now()/1000});
+    if (r.account && r.ok !== false) c.account = r.account;
+  } catch (e) {
+    Object.assign(wait, {pending: false, ok: false, text: "", error: e.message, ts: Date.now()/1000});
+  }
+  sending = false; $("#sendBtn").disabled = false; saveConvs(); renderMsgs();
+}
+
+// ================================================================= MONITOR
+let lastStats = null, mediaType = "";
+function kpi(id, v, s) { $("#" + id).textContent = v; if (s !== undefined) $("#" + id + "S").textContent = s; }
+function meter(label, used, total, text) {
+  const p = total ? Math.min(100, used / total * 100) : 0;
+  return `<div class="meter"><div class="row"><span>${label}</span><span class="muted">${text}</span></div><div class="bar"><i class="${p > 90 ? "crit" : p > 75 ? "hot" : ""}" style="width:${p.toFixed(1)}%"></i></div></div>`;
+}
+
+async function refreshMonitor() {
+  const [s, ev, logs] = await Promise.all([api("/v1/stats"), api("/v1/events?limit=60"), api("/v1/logs?limit=300")]);
+  lastStats = s;
+  const t = s.totals || {}, rate = t.requests ? (t.ok / t.requests * 100) : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const td = (s.hourly || []).filter(h => { const d = new Date(h.hour); return d.toDateString() === new Date().toDateString(); })
+    .reduce((a, h) => ({v: a.v + (h.videos||0), i: a.i + (h.images||0), r: a.r + (h.requests||0)}), {v: 0, i: 0, r: 0});
+  kpi("kVideos", fmt(t.videos), `Hôm nay ${fmt(td.v)} · trong kho ${fmt(s.media_store.videos)}`);
+  kpi("kImages", fmt(t.images), `Hôm nay ${fmt(td.i)} · trong kho ${fmt(s.media_store.images)}`);
+  const bk = s.by_kind || {};
+  kpi("kReq", fmt(t.requests), `Chat ${fmt(bk.chat?.requests)} · Batch ${fmt(bk.batch?.requests)} · API ${fmt(bk.completions?.requests)}`);
+  kpi("kRate", rate === null ? "–" : rate.toFixed(1) + "%", `${fmt(t.ok)} thành công · ${fmt(t.failed)} lỗi`);
+  kpi("kAcc", `${status?.accounts_ready ?? 0}/${status?.accounts_total ?? 0}`, `${status?.capacity ?? 0} luồng song song`);
+  kpi("kActive", fmt(s.active), `${s.batch.running} batch đang chạy`);
+  $("#uptime").textContent = "uptime " + dur(s.uptime_s);
+  const sy = s.system || {};
+  $("#sys").innerHTML =
+    meter("CPU (load 1 phút)", sy.load?.[0] || 0, sy.cpus || 1, `${(sy.load?.[0] || 0).toFixed(2)} / ${sy.cpus} lõi`) +
+    meter("RAM", sy.mem_used, sy.mem_total, `${bytes(sy.mem_used)} / ${bytes(sy.mem_total)}`) +
+    meter("Ổ đĩa", sy.disk_used, sy.disk_total, `${bytes(sy.disk_used)} / ${bytes(sy.disk_total)}`) +
+    `<div class="muted" style="font-size:12px">Media lưu trữ: ${bytes(s.media_store.bytes)} · Thống kê từ ${s.stats_since ? new Date(s.stats_since*1000).toLocaleDateString("vi-VN") : "–"}</div>`;
+  drawChart(s.hourly || []);
+
+  const ba = s.by_account || {};
+  $("#accTable").innerHTML = (status?.accounts || []).map(a => {
+    const b = ba[a.name] || {}, st = a.cooldown_s > 0 ? "cooldown" : a.status;
+    return `<tr><td><b>${esc(a.name)}</b></td><td><span class="badge ${st}">${st}${a.cooldown_s > 0 ? " " + a.cooldown_s + "s" : ""}</span></td>
+      <td class="num">${a.active}/${a.max_concurrency}</td><td class="num">${fmt(b.requests)}</td><td class="num">${fmt(b.ok)}</td><td class="num">${fmt(b.failed)}</td>
+      <td class="num">${fmt(b.videos)}</td><td class="num">${fmt(b.images)}</td><td class="muted">${ago(a.last_check)}</td></tr>`;
+  }).join("") || `<tr><td colspan="9" class="muted">Chưa có tài khoản — thêm ở tab “Tài khoản”.</td></tr>`;
+
+  const kindName = {chat: "Chat", batch: "Batch", completions: "API"};
+  $("#events").innerHTML = (ev.events || []).map(e => `<tr>
+    <td class="muted" style="white-space:nowrap">${clock(e.ts)}</td><td>${kindName[e.kind] || esc(e.kind)}</td><td>${esc(e.account)}</td>
+    <td style="white-space:nowrap">${e.ok ? `<span class="badge ok">OK</span>` : `<span class="badge fail" title="${esc(e.error)}">Lỗi</span>`}
+      ${e.videos ? ` 🎬${e.videos}` : ""}${e.images ? ` 🖼️${e.images}` : ""}${e.duration_ms ? ` <span class="muted">${Math.round(e.duration_ms/1000)}s</span>` : ""}</td>
+    <td class="ev-prompt" title="${esc(e.prompt)}">${esc(e.prompt) || '<span class="muted">—</span>'}</td></tr>`).join("")
+    || `<tr><td colspan="5" class="muted">Chưa có sự kiện nào.</td></tr>`;
+
+  $("#batchSum").textContent = `${s.batch.total} job`;
+  $("#batches").innerHTML = (s.batch.recent || []).map(j => `<tr><td class="mono">${esc(j.batch_id)}</td>
+    <td><span class="badge ${j.status === "running" ? "starting" : "ok"}">${esc(j.status)}</span></td>
+    <td class="num">${fmt(j.completed)}</td><td class="num">${fmt(j.failed)}</td><td class="num">${fmt(j.total)}</td><td class="muted">${j.created_at ? clock(j.created_at) : "–"}</td></tr>`).join("")
+    || `<tr><td colspan="6" class="muted">Chưa có batch nào.</td></tr>`;
+
+  const pre = $("#logs"), atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 20;
+  pre.textContent = (logs.lines || []).join("\n");
+  if ($("#logFollow").checked && atBottom || !pre.dataset.init) { pre.scrollTop = pre.scrollHeight; pre.dataset.init = 1; }
+  refreshGallery();
+}
+
+let galleryKey = "";
+async function refreshGallery() {
+  const m = await api("/v1/media?limit=36" + (mediaType ? "&type=" + mediaType : ""));
+  $("#mediaSum").textContent = `· ${fmt(m.count)} file`;
+  const k = mediaType + "|" + (m.media || []).map(x => x.name).join(",");
+  if (k === galleryKey) return; galleryKey = k;
+  $("#gallery").innerHTML = (m.media || []).map(x => { const src = esc(mediaUrl(x.url));
+    return `<a href="${src}" target="_blank" rel="noopener" title="${esc(x.name)} · ${bytes(x.size)} · ${clock(x.mtime)}">
+      ${x.type === "video" ? `<video src="${src}#t=0.5" muted preload="metadata"></video>` : `<img src="${src}" loading="lazy" alt="">`}
+      <span class="tag">${x.type === "video" ? "Video" : "Ảnh"}</span></a>`; }).join("") || `<div class="muted">Chưa có media.</div>`;
+}
+$$("#mediaSeg button").forEach(b => b.onclick = () => { $$("#mediaSeg button").forEach(x => x.classList.toggle("on", x === b)); mediaType = b.dataset.t; refreshGallery(); });
+
+function drawChart(hourly) {
+  const svg = $("#chart"), W = svg.clientWidth || 600, H = 220, pad = {l: 28, r: 6, t: 8, b: 22};
+  const now = new Date(); now.setMinutes(0, 0, 0);
+  const map = Object.fromEntries(hourly.map(h => [h.hour, h]));
+  const pad2 = n => String(n).padStart(2, "0");
+  const slots = [];
+  for (let i = 47; i >= 0; i--) { const d = new Date(now - i * 3600e3);
+    const key = `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:00`;
+    const h = map[key] || {}; slots.push({d, v: h.videos || 0, i: h.images || 0, f: h.failed || 0, r: h.requests || 0}); }
+  const max = Math.max(4, ...slots.map(s => s.v + s.i + s.f));
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b, bw = iw / slots.length, y = v => pad.t + ih - v / max * ih;
+  const cs = getComputedStyle(document.documentElement), col = n => cs.getPropertyValue(n).trim();
+  let g = "";
+  const ticks = [0, Math.round(max/2), max];
+  ticks.forEach(t => g += `<line x1="${pad.l}" x2="${W-pad.r}" y1="${y(t)}" y2="${y(t)}" stroke="${col("--line")}"/><text x="${pad.l-6}" y="${y(t)+3}" text-anchor="end">${t}</text>`);
+  slots.forEach((s, k) => {
+    const x = pad.l + k * bw + 1, w = Math.max(1, bw - 2); let base = 0;
+    [["v", "--video"], ["i", "--image"], ["f", "--fail"]].forEach(([key, c]) => { if (s[key]) { g += `<rect x="${x}" y="${y(base + s[key])}" width="${w}" height="${y(base) - y(base + s[key])}" fill="${col(c)}" rx="1"/>`; base += s[key]; } });
+    g += `<rect x="${pad.l + k*bw}" y="${pad.t}" width="${bw}" height="${ih}" fill="transparent" data-k="${k}"/>`;
+    if (s.d.getHours() % 6 === 0) g += `<text x="${x + w/2}" y="${H-6}" text-anchor="middle">${s.d.getHours() === 0 ? pad2(s.d.getDate()) + "/" + pad2(s.d.getMonth()+1) : pad2(s.d.getHours()) + "h"}</text>`;
+  });
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.innerHTML = g;
+  const tip = $("#tip");
+  svg.onmousemove = e => { const k = e.target.dataset?.k; if (k === undefined) { tip.style.display = "none"; return; } const s = slots[k];
+    tip.innerHTML = `<b>${pad2(s.d.getHours())}:00 ${pad2(s.d.getDate())}/${pad2(s.d.getMonth()+1)}</b><br>Video ${s.v} · Ảnh ${s.i} · Lỗi ${s.f} · Request ${s.r}`;
+    tip.style.display = "block"; tip.style.left = Math.min(e.clientX + 12, innerWidth - 220) + "px"; tip.style.top = (e.clientY + 12) + "px"; };
+  svg.onmouseleave = () => tip.style.display = "none";
+}
+addEventListener("resize", () => lastStats && tab === "monitor" && drawChart(lastStats.hourly));
+
+// ================================================================= ACCOUNTS
+const confirmDel = {};
+let accSort = "default"; try { accSort = localStorage.getItem("accSort") || "default"; } catch {}
+const SORT_LABEL = {default: "Sắp xếp: mặc định", active: "Sắp xếp: hoạt động trước", inactive: "Sắp xếp: lỗi/hết hạn trước"};
+function sortedAccounts() {
+  const list = [...(status?.accounts || [])];
+  const live = a => (a.cooldown_s > 0 ? "cooldown" : a.status) === "ready" ? 1 : 0;
+  if (accSort === "active") list.sort((x, y) => live(y) - live(x));
+  else if (accSort === "inactive") list.sort((x, y) => live(x) - live(y));
+  return list;
+}
+function renderAccounts() {
+  $("#accSort").textContent = SORT_LABEL[accSort];
+  $("#accList").innerHTML = sortedAccounts().map(a => { const st = a.cooldown_s > 0 ? "cooldown" : a.status;
+    return `<tr><td><b>${esc(a.name)}</b><div class="muted mono">${esc(a.file)}</div></td>
+    <td><span class="badge ${st}">${st}</span></td><td class="num">${a.active}/${a.max_concurrency}</td>
+    <td class="num">${fmt(a.done)} / ${fmt(a.failed)}</td><td class="muted">${ago(a.last_check)}</td>
+    <td class="muted" style="max-width:220px">${esc(a.last_error)}</td>
+    <td style="white-space:nowrap"><button class="btn sm" data-check="${esc(a.name)}">Kiểm tra</button>
+      <button class="btn sm danger" data-del="${esc(a.name)}">${confirmDel[a.name] ? "Bấm lần nữa để xoá" : "Xoá"}</button></td></tr>`; }).join("")
+    || `<tr><td colspan="7" class="muted">Chưa có tài khoản nào.</td></tr>`;
+  $$("[data-check]").forEach(b => b.onclick = async () => { b.disabled = true; b.innerHTML = '<span class="spin"></span>';
+    await api("/v1/accounts/check?account=" + encodeURIComponent(b.dataset.check), {method: "POST"}); await refreshStatus(); renderAccounts(); });
+  $$("[data-del]").forEach(b => b.onclick = async () => { const n = b.dataset.del;
+    if (!confirmDel[n]) { confirmDel[n] = true; renderAccounts(); setTimeout(() => { delete confirmDel[n]; tab === "accounts" && renderAccounts(); }, 4000); return; }
+    delete confirmDel[n]; b.disabled = true; const r = await api("/v1/accounts?name=" + encodeURIComponent(n), {method: "DELETE"});
+    accMsg(r.ok ? `Đã xoá ${n}.` : r.error, r.ok); await refreshStatus(); renderAccounts(); });
+}
+function accMsg(t, ok) { const el = $("#accMsg"); el.textContent = t || ""; el.className = "msgline " + (ok ? "ok" : "bad"); }
+$("#accFile").onchange = async e => { const f = e.target.files[0]; if (!f) return; $("#accCookies").value = await f.text();
+  if (!$("#accName").value) $("#accName").value = f.name.replace(/\.(json|txt)$/i, "").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 40); e.target.value = ""; };
+$("#accAdd").onclick = async () => {
+  const name = $("#accName").value.trim(), cookies = $("#accCookies").value.trim();
+  if (!name || !cookies) return accMsg("Nhập tên và cookie.", false);
+  const b = $("#accAdd"); b.disabled = true; b.innerHTML = '<span class="spin"></span> Đang đăng nhập thử…';
+  try {
+    const r = await api("/v1/accounts", {method: "POST", body: JSON.stringify({name, cookies, overwrite: $("#accOverwrite").checked})});
+    if (r.ok) { const st = r.account?.status; accMsg(`Đã thêm ${name} (${r.cookies} cookie) — trạng thái: ${st}${st !== "ready" && r.account?.last_error ? " · " + r.account.last_error : ""}`, st === "ready");
+      $("#accCookies").value = ""; $("#accName").value = ""; $("#accOverwrite").checked = false; }
+    else accMsg(r.error, false);
+  } finally { b.disabled = false; b.textContent = "Thêm tài khoản"; await refreshStatus(); renderAccounts(); }
+};
+$("#accSort").onclick = () => { accSort = {default: "active", active: "inactive", inactive: "default"}[accSort];
+  try { localStorage.setItem("accSort", accSort); } catch {} renderAccounts(); };
+$("#accReload").onclick = async () => { const r = await api("/v1/accounts/reload", {method: "POST"});
+  accMsg(`Quét xong: +${r.added?.length || 0} ~${r.changed?.length || 0} -${r.removed?.length || 0}`, true); await refreshStatus(); renderAccounts(); };
+$("#accCheckAll").onclick = async e => { const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span>';
+  await api("/v1/accounts/check", {method: "POST"}); b.disabled = false; b.textContent = "Kiểm tra tất cả"; await refreshStatus(); renderAccounts(); };
+
+// ---------------------------------------------------------------- bulk + expiry banner
+let bulkFiles = [];
+const accName = n => n.replace(/\.(json|txt)$/i, "").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 40);
+$("#bulkFiles").onchange = e => { bulkFiles = Array.from(e.target.files); $("#bulkPicked").textContent = bulkFiles.length ? `${bulkFiles.length} file đã chọn` : ""; e.target.value = ""; };
+function bulkMsg(t, ok) { const el = $("#bulkMsg"); el.textContent = t || ""; el.className = "msgline " + (ok ? "ok" : "bad"); }
+$("#bulkAdd").onclick = async () => {
+  const accounts = [];
+  for (const f of bulkFiles) accounts.push({name: accName(f.name), cookies: await f.text()});
+  const txt = $("#bulkJson").value.trim();
+  if (txt) { let m; try { m = JSON.parse(txt); } catch { return bulkMsg("JSON dán vào không hợp lệ.", false); }
+    if (Array.isArray(m)) accounts.push(...m); else if (m && typeof m === "object") for (const [k, v] of Object.entries(m)) accounts.push({name: k, cookies: v});
+    else return bulkMsg("JSON phải là map {tên: cookies} hoặc mảng [{name, cookies}].", false); }
+  if (!accounts.length) return bulkMsg("Chọn file hoặc dán JSON.", false);
+  const b = $("#bulkAdd"); b.disabled = true; b.innerHTML = '<span class="spin"></span> Đang nạp ' + accounts.length + ' tài khoản…';
+  try {
+    const r = await api("/v1/accounts/bulk", {method: "POST", body: JSON.stringify({accounts, overwrite: $("#bulkOverwrite").checked})});
+    if (!r.ok) return bulkMsg(r.error, false);
+    bulkMsg(`Ghi ${r.written}/${r.results.length} tài khoản.`, r.written === r.results.length);
+    $("#bulkResult").innerHTML = r.results.map(x => `<tr><td><b>${esc(x.name)}</b></td><td><span class="badge ${x.ok ? (x.status || "starting") : "error"}">${x.ok ? esc(x.result) + " · " + esc(x.status || "?") : "invalid"}</span></td><td class="muted">${esc(x.error || (x.cookies + " cookie"))}</td></tr>`).join("");
+    bulkFiles = []; $("#bulkPicked").textContent = ""; $("#bulkJson").value = "";
+  } finally { b.disabled = false; b.textContent = "Thêm hàng loạt"; await refreshStatus(); renderAccounts(); renderExpiry(); }
+};
+
+// ---------------------------------------------------------------- auto extract & login
+const autoInput = $("#autoAccInput");
+if (autoInput) {
+  const updateAutoCount = () => {
+    const raw = autoInput.value;
+    const lines = raw.split("\n").map(l => l.trim()).filter(l => l && !l.startsWith("#"));
+    $("#autoAccCount").textContent = `${lines.length} tài khoản`;
+  };
+  autoInput.addEventListener("input", updateAutoCount);
+  autoInput.addEventListener("change", updateAutoCount);
+}
+
+const runAuto = async (btnAuto, idleLabel, url, extra) => {
+    const raw = $("#autoAccInput").value.trim();
+    if (!raw) {
+      alert("Vui lòng nhập ít nhất 1 tài khoản (mail | password)!");
+      return;
+    }
+    const progBox = $("#autoAccProgress");
+    const bar = $("#autoAccBar");
+    const statusTxt = $("#autoAccStatus");
+    const ratioTxt = $("#autoAccRatio");
+    const logsEl = $("#autoAccLogs");
+
+    progBox.style.display = "";
+    bar.style.width = "0%";
+    statusTxt.textContent = "Đang kết nối...";
+    statusTxt.style.color = "var(--accent)";
+    ratioTxt.textContent = "0/0";
+    logsEl.textContent = "";
+
+    const appendLog = (msg) => {
+      const d = new Date().toLocaleTimeString("vi-VN");
+      logsEl.textContent += `[${d}] ${msg}\n`;
+      logsEl.scrollTop = logsEl.scrollHeight;
+    };
+
+    btnAuto.disabled = true;
+    btnAuto.innerHTML = '<span class="spin"></span> Đang xử lý...';
+
+    try {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": KEY,
+        },
+        body: JSON.stringify({
+          accounts_raw: raw,
+          overwrite: $("#autoAccOverwrite").checked,
+          skip_active: $("#autoAccSkip").checked,
+          ...extra,
+        }),
+      });
+
+      if (resp.status === 401) {
+        showLogin("API key không đúng hoặc đã đổi.");
+        appendLog("Lỗi: 401 Unauthorized");
+        return;
+      }
+
+      if (!resp.ok) {
+        let err = "HTTP " + resp.status;
+        try {
+          const j = await resp.json();
+          err = j.error || err;
+        } catch {}
+        appendLog("Lỗi: " + err);
+        statusTxt.textContent = "Lỗi khởi động";
+        statusTxt.style.color = "var(--bad)";
+        return;
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split("\n\n");
+        buffer = blocks.pop();
+
+        for (const block of blocks) {
+          for (const line of block.split("\n")) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const ev = JSON.parse(line.slice(6).trim());
+              if (ev.message) appendLog(ev.message);
+              if (ev.progress) {
+                const cur = ev.progress.current || 0, tot = ev.progress.total || 1;
+                ratioTxt.textContent = `${cur}/${tot}`;
+                const pct = Math.round((cur / tot) * 100);
+                bar.style.width = `${pct}%`;
+              }
+              if (ev.status === "ACCOUNT_START") {
+                statusTxt.textContent = `Đang xử lý: ${ev.progress?.email || ""}`;
+                statusTxt.style.color = "var(--accent)";
+              } else if (ev.status === "SUCCESS") {
+                await refreshStatus();
+                renderAccounts();
+              } else if (ev.status === "ALL_DONE") {
+                statusTxt.textContent = "Hoàn thành!";
+                statusTxt.style.color = "var(--ok)";
+              }
+            } catch (e) {
+              console.error("SSE parse error", e);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      appendLog(url.startsWith("http") ? "Không kết nối được máy local — đã chạy 'python3 tools/local_login_server.py' chưa? (" + e.message + ")" : "Lỗi kết nối mạng hoặc server gián đoạn: " + e.message);
+      statusTxt.textContent = "Lỗi kết nối";
+      statusTxt.style.color = "var(--bad)";
+    } finally {
+      btnAuto.disabled = false;
+      btnAuto.textContent = idleLabel;
+      await refreshStatus();
+      renderAccounts();
+      renderExpiry();
+    }
+  };
+
+const btnAutoVps = $("#btnStartAutoAcc"), btnAutoLocal = $("#btnStartLocalAcc");
+const IDLE_VPS = "⚡ Bắt đầu đăng nhập & Nạp vào Pool", IDLE_LOCAL = "🖥️ Đăng nhập local (tự giải captcha)";
+if (btnAutoVps) btnAutoVps.onclick = () => runAuto(btnAutoVps, IDLE_VPS, "/v1/accounts/auto-extract", {});
+// The local login page hands over each finished account's cookies; this page owns the dashboard session, so it posts them.
+window.addEventListener("message", async (e) => {
+  if (e.origin !== "http://127.0.0.1:8771" || !e.data || !e.data.museLocal) return;
+  const {name, cookies, overwrite, video_state} = e.data;
+  let r; try { r = await api("/v1/accounts", {method: "POST", body: JSON.stringify({name, cookies, overwrite, video_state})}); }
+  catch (err) { r = {ok: false, error: String(err.message || err)}; }
+  e.source.postMessage({museAck: 1, name, ok: !!r.ok, error: r.error}, e.origin);
+  try { await refreshStatus(); renderAccounts(); } catch {}
+});
+// Opened as a page of the local server (not fetched from here): a remote page calling 127.0.0.1 is blocked by Chrome.
+if (btnAutoLocal) btnAutoLocal.onclick = () => {
+  const raw = $("#autoAccInput").value.trim();
+  if (!raw) { alert("Vui lòng nhập ít nhất 1 tài khoản (mail | password)!"); return; }
+  // Accounts already ready in the pool are skipped by the local server (only expired / new ones log in again).
+  const skip = $("#autoAccSkip").checked ? (status?.accounts || []).filter(a => a.status === "ready").map(a => a.name) : [];
+  const cfg = {accounts_raw: raw, overwrite: $("#autoAccOverwrite").checked, target: location.origin, key: KEY, skip};
+  window.open("http://127.0.0.1:8771/#" + btoa(unescape(encodeURIComponent(JSON.stringify(cfg)))), "_blank");
+};
+
+function renderExpiry() {
+  const n = status?.accounts_expired || 0, el = $("#expBanner"); if (!el) return;
+  el.style.display = (n || status?.telegram === false) ? "" : "none";
+  $("#expText").textContent = n ? `${n} tài khoản hết hạn/lỗi — dán cookie mới (Ghi đè)` : "";
+  $("#tgState").textContent = status?.telegram ? "Telegram: bật" : "Telegram: chưa cấu hình (TELEGRAM_BOT_TOKEN/CHAT_ID)";
+}
+$("#tgTest").onclick = async () => { const r = await api("/v1/notify/test", {method: "POST"}); $("#tgState").textContent = r.ok ? "Đã gửi tin thử ✓" : (r.error || "lỗi"); };
+setInterval(() => { try { renderExpiry(); } catch {} }, 3000);
+
+// ================================================================= loop
+let busy = false;
+async function refreshAll() {
+  // no stored key is fine: the server only serves this page to an admin session cookie
+  if (busy) return; busy = true;
+  try {
+    await refreshStatus();
+    if (tab === "monitor") await refreshMonitor();
+    if (tab === "accounts") renderAccounts();
+  } catch (e) { if (e.message !== "unauthorized") console.warn(e); }
+  finally { busy = false; }
+}
+setInterval(() => { if (!document.hidden && tab !== "chat") refreshAll(); }, 5000);
+setInterval(() => { if (!document.hidden && tab === "chat") refreshAll(); }, 20000);
+// a pending reply left over from a reload can never resolve; mark it so the conversation is usable
+convs.forEach(c => c.messages.forEach(m => { if (m.pending) Object.assign(m, {pending: false, ok: false, error: "trang đã tải lại trước khi có kết quả — xem tab Monitor"}); }));
+renderConvs(); renderMsgs(); setTab(tab);
+})();
+
+$("#btnSheet").addEventListener("click", async () => {
+  const msg = $("#sheetMsg"), btn = $("#btnSheet");
+  msg.textContent = "Đang tải…"; btn.disabled = true;
+  try {
+    const r = await fetch("/v1/accounts/sheet", {method: "POST",
+      headers: {"Content-Type": "application/json", "X-API-Key": KEY},
+      body: JSON.stringify({url: $("#sheetUrl").value})});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { msg.textContent = j.error || ("HTTP " + r.status); return; }
+    const ta = $("#autoAccInput");
+    ta.value = j.accounts_raw;
+    ta.dispatchEvent(new Event("input"));
+    msg.textContent = "Đã nạp " + j.count + " tài khoản — bấm Bắt đầu để chạy";
+  } catch (e) { msg.textContent = "Lỗi: " + e; }
+  finally { btn.disabled = false; }
+});
+</script>
+</body>
+</html>

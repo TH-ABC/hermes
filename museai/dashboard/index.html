@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent 3T Global</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#262b36; --text:#e8eaf0; --mute:#8b93a7; --accent:#4f8cff; --bad:#ef5b5b; --ok:#3ecf8e; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f5f6f9; --panel:#fff; --line:#e1e4ec; --text:#171a21; --mute:#6b7388; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  button, input, textarea { font:inherit; color:inherit; }
+  .hidden { display:none !important; }
+  .btn { background:var(--accent); color:#fff; border:0; border-radius:8px; padding:8px 14px; cursor:pointer; }
+  .btn.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
+  .btn.bad { background:var(--bad); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  input, textarea { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:9px 11px; width:100%; }
+  .brand { font-weight:700; letter-spacing:.2px; }
+  .brand b { color:var(--accent); }
+
+  #login { min-height:100vh; display:grid; place-items:center; padding:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:28px; width:100%; max-width:380px; }
+  .card h1 { margin:0 0 4px; font-size:22px; }
+  .card p { margin:0 0 18px; color:var(--mute); }
+  .card label { display:block; margin:12px 0 4px; color:var(--mute); font-size:12px; }
+  .err { color:var(--bad); min-height:20px; margin-top:10px; font-size:13px; }
+
+  #app { display:grid; grid-template-columns:260px 1fr; height:100vh; }
+  aside { background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+  aside header { padding:16px; border-bottom:1px solid var(--line); }
+  .nav { display:flex; gap:6px; padding:10px 12px 0; }
+  .nav button { flex:1; }
+  .nav button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #convs { flex:1; overflow:auto; padding:10px 8px; }
+  .conv { display:flex; align-items:center; gap:6px; padding:8px 10px; border-radius:8px; cursor:pointer; }
+  .conv:hover, .conv.on { background:var(--bg); }
+  .conv span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .conv i { color:var(--mute); font-style:normal; padding:0 4px; }
+  .conv i:hover { color:var(--bad); }
+  aside footer { padding:12px 16px; border-top:1px solid var(--line); color:var(--mute); font-size:12px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  aside footer span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  main { display:flex; flex-direction:column; min-height:0; min-width:0; }
+  .view { display:flex; flex-direction:column; flex:1; min-height:0; }
+  #msgs { flex:1; overflow:auto; padding:24px max(16px, calc((100% - 760px)/2)); }
+  .empty { margin:18vh auto 0; text-align:center; color:var(--mute); }
+  .empty h2 { color:var(--text); margin:0 0 6px; }
+  .msg { margin:0 0 18px; display:flex; }
+  .msg.user { justify-content:flex-end; }
+  .bubble { max-width:85%; padding:10px 14px; border-radius:14px; white-space:pre-wrap; word-break:break-word; background:var(--panel); border:1px solid var(--line); }
+  .msg.user .bubble { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .bubble video, .bubble img { max-width:100%; border-radius:10px; margin-top:8px; display:block; }
+  .composer { padding:12px max(16px, calc((100% - 760px)/2)) 20px; }
+  .composer form { display:flex; gap:8px; align-items:flex-end; }
+  .composer textarea { resize:none; max-height:160px; }
+
+  #previews { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  #previews:empty { display:none; }
+  .pv { position:relative; }
+  .pv img { height:64px; border-radius:8px; border:1px solid var(--line); display:block; }
+  .pv b { position:absolute; top:-6px; right:-6px; width:18px; height:18px; border-radius:50%; background:var(--bad); color:#fff; font-size:11px; line-height:18px; text-align:center; cursor:pointer; }
+  .composer.drag { outline:2px dashed var(--accent); outline-offset:-6px; }
+  #attach { padding:8px 11px; }
+  .bubble .thumbs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+  .bubble .thumbs img { height:90px; width:auto; margin:0; }
+  #admin { padding:24px max(16px, calc((100% - 900px)/2)); overflow:auto; }
+  #admin h2 { margin:0 0 14px; }
+  .row { display:grid; grid-template-columns:1.2fr 1fr 1fr auto; gap:8px; margin-bottom:18px; }
+  table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); }
+  th { color:var(--mute); font-weight:500; font-size:12px; }
+  td .btn { padding:4px 9px; margin-right:4px; font-size:12px; }
+  .tag { font-size:11px; padding:2px 8px; border-radius:99px; border:1px solid var(--line); color:var(--mute); }
+  .tag.ok { color:var(--ok); } .tag.off { color:var(--bad); }
+
+  @media (max-width:760px) {
+    #app { grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+    aside { max-height:34vh; border-right:0; border-bottom:1px solid var(--line); }
+    .row { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<section id="login">
+  <form class="card" id="login-form">
+    <div class="brand" style="margin-bottom:14px">Agent <b>3T</b> Global</div>
+    <h1>Đăng nhập</h1>
+    <p>Tài khoản do quản trị viên cấp.</p>
+    <label for="email">Email</label>
+    <input id="email" type="text" autocomplete="username" placeholder="admin hoặc email" required>
+    <label for="pw">Mật khẩu</label>
+    <input id="pw" type="password" autocomplete="current-password" required>
+    <button class="btn" style="width:100%;margin-top:18px" id="login-btn">Đăng nhập</button>
+    <div class="err" id="login-err"></div>
+  </form>
+</section>
+
+<section id="app" class="hidden">
+  <aside>
+    <header>
+      <div class="brand">Agent <b>3T</b> Global</div>
+    </header>
+    <div class="nav">
+      <button class="btn ghost on" id="nav-chat">Chat</button>
+      <button class="btn ghost hidden" id="nav-admin">Người dùng</button>
+    </div>
+    <div style="padding:10px 12px 0"><button class="btn" style="width:100%" id="new-chat">+ Cuộc trò chuyện mới</button></div>
+    <div id="convs"></div>
+    <footer><span id="who"></span><button class="btn ghost" id="logout">Thoát</button></footer>
+  </aside>
+
+  <main>
+    <div class="view" id="chat-view">
+      <div id="msgs"></div>
+      <div class="composer" id="composer">
+        <div id="previews"></div>
+        <form id="chat-form">
+          <button type="button" class="btn ghost" id="attach" title="Đính kèm ảnh">📎</button>
+          <input type="file" id="file-input" accept="image/*" multiple class="hidden">
+          <textarea id="prompt" rows="1" placeholder="Nhắn tin cho Agent 3T Global… (Enter gửi, Shift+Enter xuống dòng)"></textarea>
+          <button class="btn" id="send">Gửi</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="view hidden" id="admin">
+      <h2>Quản lý người dùng</h2>
+      <form class="row" id="create-form">
+        <input id="n-name" placeholder="Họ tên">
+        <input id="n-email" type="email" placeholder="Email đăng nhập" required>
+        <input id="n-pw" type="text" placeholder="Mật khẩu (≥ 8 ký tự)" minlength="8" required>
+        <button class="btn">Tạo tài khoản</button>
+      </form>
+      <div class="err" id="admin-err" style="margin:-8px 0 10px"></div>
+      <table>
+        <thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th></th></tr></thead>
+        <tbody id="users"></tbody>
+      </table>
+    </div>
+  </main>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const { SUPABASE_URL, SUPABASE_KEY } = window.A3T_CONFIG;
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let me = null, currentConv = null, busy = false;
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+async function callFn(name, body) {
+  const { data: { session } } = await sb.auth.getSession();
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_KEY },
+    body: JSON.stringify(body),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || `Lỗi ${r.status}`);
+  return d;
+}
+
+// ---------- auth ----------
+const loginName = (v) => { v = v.trim().toLowerCase(); return v.includes("@") ? v : v + "@agent3t.local"; };
+$("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("login-err").textContent = "";
+  $("login-btn").disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email: loginName($("email").value), password: $("pw").value });
+  $("login-btn").disabled = false;
+  if (error) { $("login-err").textContent = "Sai email hoặc mật khẩu, hoặc tài khoản bị khóa."; return; }
+  boot();
+});
+$("logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function boot() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { $("login").classList.remove("hidden"); $("app").classList.add("hidden"); return; }
+  const { data: p } = await sb.from("profiles").select("*").eq("id", session.user.id).maybeSingle();
+  if (!p || p.disabled) { await sb.auth.signOut(); $("login-err").textContent = "Tài khoản không có quyền truy cập."; return; }
+  me = p;
+  $("login").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  $("who").textContent = p.full_name || p.email;
+  $("nav-admin").classList.toggle("hidden", p.role !== "admin");
+  showView("chat");
+  await loadConvs();
+  renderMsgs([]);
+}
+
+// ---------- views ----------
+function showView(v) {
+  $("chat-view").classList.toggle("hidden", v !== "chat");
+  $("admin").classList.toggle("hidden", v !== "admin");
+  $("nav-chat").classList.toggle("on", v === "chat");
+  $("nav-admin").classList.toggle("on", v === "admin");
+  if (v === "admin") loadUsers();
+}
+$("nav-chat").onclick = () => showView("chat");
+$("nav-admin").onclick = () => showView("admin");
+
+// ---------- chat ----------
+async function loadConvs() {
+  const { data } = await sb.from("conversations").select("id,title").order("updated_at", { ascending: false });
+  $("convs").innerHTML = (data || []).map((c) =>
+    `<div class="conv ${c.id === currentConv ? "on" : ""}" data-id="${c.id}"><span>${esc(c.title)}</span><i data-del="${c.id}" title="Xóa">✕</i></div>`).join("");
+}
+$("convs").addEventListener("click", async (e) => {
+  const del = e.target.dataset.del;
+  if (del) {
+    if (!confirm("Xóa cuộc trò chuyện này?")) return;
+    await sb.from("conversations").delete().eq("id", del);
+    if (currentConv === del) { currentConv = null; renderMsgs([]); }
+    return loadConvs();
+  }
+  const row = e.target.closest(".conv");
+  if (row) openConv(row.dataset.id);
+});
+async function openConv(id) {
+  currentConv = id; showView("chat");
+  const { data } = await sb.from("messages").select("*").eq("conversation_id", id).order("id");
+  renderMsgs(data || []); loadConvs();
+}
+$("new-chat").onclick = () => { currentConv = null; showView("chat"); renderMsgs([]); loadConvs(); $("prompt").focus(); };
+
+function renderMsgs(list) {
+  const box = $("msgs");
+  if (!list.length) {
+    box.innerHTML = `<div class="empty"><h2>Agent 3T Global</h2><div>Bắt đầu trò chuyện hoặc tạo nội dung.</div></div>`;
+    return;
+  }
+  box.innerHTML = "";
+  list.forEach(addMsg);
+  box.scrollTop = box.scrollHeight;
+}
+function addMsg(m) {
+  const box = $("msgs");
+  const el = document.createElement("div");
+  el.className = "msg " + m.role;
+  el.innerHTML = `<div class="bubble">${esc(m.content)}</div>`;
+  box.appendChild(el);
+  (m.media || []).forEach((path) => attachMedia(el.firstChild, path));
+  box.scrollTop = box.scrollHeight;
+  return el;
+}
+async function attachMedia(bubble, path) {
+  const { data: { session } } = await sb.auth.getSession();
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/chat?media=${encodeURIComponent(path)}`, {
+    headers: { Authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_KEY },
+  });
+  if (!r.ok) return;
+  const url = URL.createObjectURL(await r.blob());
+  const isVideo = /\.(mp4|webm|mov)$/i.test(path);
+  const node = document.createElement(isVideo ? "video" : "img");
+  node.src = url;
+  if (isVideo) node.controls = true;
+  bubble.appendChild(node);
+}
+
+// ---------- ảnh đính kèm ----------
+let pending = []; // data URLs (đã thu nhỏ)
+const MAX_IMAGES = 6;
+function shrink(file, max = 1600) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg", 0.88));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Không đọc được ảnh")); };
+    img.src = url;
+  });
+}
+async function addFiles(files) {
+  for (const f of files) {
+    if (!f.type.startsWith("image/")) continue;
+    if (pending.length >= MAX_IMAGES) break;
+    try { pending.push(await shrink(f)); } catch (e) { console.warn(e); }
+  }
+  renderPreviews();
+}
+function renderPreviews() {
+  $("previews").innerHTML = pending.map((u, i) => `<div class="pv"><img src="${u}"><b data-rm="${i}">✕</b></div>`).join("");
+}
+$("previews").addEventListener("click", (e) => {
+  if (e.target.dataset.rm !== undefined) { pending.splice(+e.target.dataset.rm, 1); renderPreviews(); }
+});
+$("attach").onclick = () => $("file-input").click();
+$("file-input").onchange = (e) => { addFiles([...e.target.files]); e.target.value = ""; };
+$("prompt").addEventListener("paste", (e) => {
+  const imgs = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith("image/"));
+  if (imgs.length) { e.preventDefault(); addFiles(imgs); }
+});
+const comp = $("composer");
+["dragenter", "dragover"].forEach((t) => comp.addEventListener(t, (e) => { e.preventDefault(); comp.classList.add("drag"); }));
+["dragleave", "drop"].forEach((t) => comp.addEventListener(t, (e) => { e.preventDefault(); comp.classList.remove("drag"); }));
+comp.addEventListener("drop", (e) => addFiles([...e.dataTransfer.files]));
+
+$("chat-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("prompt").value.trim();
+  const files = pending.slice();
+  if ((!text && !files.length) || busy) return;
+  busy = true; $("send").disabled = true;
+  clearPrompt(); // bộ gõ có thể chèn lại chữ vừa chốt
+  pending = []; renderPreviews();
+  if (!$("msgs").querySelector(".msg")) $("msgs").innerHTML = "";
+  const um = addMsg({ role: "user", content: text });
+  if (files.length) {
+    const t = document.createElement("div"); t.className = "thumbs";
+    t.innerHTML = files.map((u) => `<img src="${u}">`).join("");
+    um.firstChild.prepend(t);
+  }
+  const wait = addMsg({ role: "assistant", content: "Đang xử lý…" });
+  try {
+    const d = await callFn("chat", { prompt: text, files, conversation_id: currentConv });
+    currentConv = d.conversation_id;
+    wait.remove();
+    addMsg({ role: "assistant", content: d.content, media: d.media });
+    loadConvs();
+  } catch (err) {
+    wait.querySelector(".bubble").textContent = "Lỗi: " + err.message;
+  }
+  busy = false; $("send").disabled = false; $("prompt").focus();
+});
+// blur() buộc bộ gõ chốt/hủy chữ đang gõ dở, rồi mới xóa và focus lại.
+function clearPrompt() {
+  const el = $("prompt");
+  el.blur(); el.value = ""; el.focus();
+  setTimeout(() => { if (el.value) el.value = ""; }, 50);
+}
+$("prompt").addEventListener("compositionend", () => { if (busy) clearPrompt(); });
+$("prompt").addEventListener("keydown", (e) => {
+  if (e.isComposing || e.keyCode === 229) return; // đang gõ dở bằng bộ gõ (Telex/VNI): Enter chỉ để chốt chữ
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("chat-form").requestSubmit(); }
+});
+
+// ---------- admin ----------
+async function loadUsers() {
+  try {
+    const { users } = await callFn("admin-users", { action: "list" });
+    $("users").innerHTML = users.map((u) => `
+      <tr>
+        <td>${esc(u.full_name) || "—"}</td><td>${esc(u.email)}</td>
+        <td><span class="tag">${u.role}</span></td>
+        <td><span class="tag ${u.disabled ? "off" : "ok"}">${u.disabled ? "Đã khóa" : "Hoạt động"}</span></td>
+        <td>${u.id === me.id ? "" : `
+          <button class="btn ghost" data-act="pw" data-id="${u.id}">Đổi MK</button>
+          <button class="btn ghost" data-act="toggle" data-id="${u.id}" data-dis="${u.disabled}">${u.disabled ? "Mở khóa" : "Khóa"}</button>
+          <button class="btn bad" data-act="del" data-id="${u.id}">Xóa</button>`}</td>
+      </tr>`).join("");
+  } catch (err) { $("admin-err").textContent = err.message; }
+}
+$("create-form").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("admin-err").textContent = "";
+  try {
+    await callFn("admin-users", { action: "create", full_name: $("n-name").value, email: $("n-email").value, password: $("n-pw").value });
+    e.target.reset(); loadUsers();
+  } catch (err) { $("admin-err").textContent = err.message; }
+});
+$("users").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const { act, id } = b.dataset; $("admin-err").textContent = "";
+  try {
+    if (act === "pw") {
+      const pw = prompt("Mật khẩu mới (≥ 8 ký tự):"); if (!pw) return;
+      await callFn("admin-users", { action: "set_password", id, password: pw });
+    } else if (act === "toggle") {
+      await callFn("admin-users", { action: "set_disabled", id, disabled: b.dataset.dis !== "true" });
+    } else if (act === "del") {
+      if (!confirm("Xóa vĩnh viễn tài khoản này và toàn bộ lịch sử chat?")) return;
+      await callFn("admin-users", { action: "delete", id });
+    }
+    loadUsers();
+  } catch (err) { $("admin-err").textContent = err.message; }
+});
+
+boot();
+</script>
+</body>
+</html>

@@ -25,6 +25,11 @@ logger = logging.getLogger(__name__)
 
 def get_museai_dir() -> Path:
     """Dynamically resolve MuseAI project directory across Windows/macOS/Linux."""
+    # 1. Directly inside this repo root (all-in-one hermes repo)
+    repo_museai = Path(__file__).resolve().parent.parent / "museai"
+    if repo_museai.is_dir():
+        return repo_museai
+
     env_dir = os.environ.get("MUSEAI_DIR")
     if env_dir and os.path.isdir(env_dir):
         return Path(env_dir)

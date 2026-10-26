@@ -1,0 +1,21 @@
+[Unit]
+Description=MuseAI multi-account bridge pool
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=/etc/musebridge.env
+Environment=PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
+ExecStart=/bin/sh -c 'exec __APP_DIR__/.venv/bin/python -u bridge/pool.py --cookies-dir __APP_DIR__/cookies --port ${MUSEAI_PORT} --host ${MUSEAI_HOST} --per-account ${MUSEAI_PER_ACCOUNT}'
+Restart=always
+RestartSec=5
+MemoryMax=90%
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

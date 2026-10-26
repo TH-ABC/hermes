@@ -1,0 +1,6 @@
+aiohttp
+playwright
+requests
+websockets
+cryptography
+protobuf

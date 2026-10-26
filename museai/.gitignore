@@ -1,0 +1,38 @@
+# Secrets / local — TUYỆT ĐỐI không commit
+.env
+.env.*
+!.env.example
+cookies.json
+cookies/*.json
+cookies/
+!cookies/.gitkeep
+*.cookies
+storage_state*.json
+auth*.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Python caches / venv
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+
+# Thư mục làm việc / sinh ra (media, scratch, exploration) — không phải source
+scratch/
+output/
+research/
+refs/
+logs/
+*.log
+cookies/
+cookies_out/
+.venv-local/

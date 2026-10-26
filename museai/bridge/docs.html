@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tài liệu REST API & Hướng dẫn Tailscale — Agent 3T Global</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+
+  <style>
+    :root {
+      --bg-body: #090a0f;
+      --bg-surface: #111420;
+      --bg-surface-elevated: #181d2e;
+      --bg-code: #0b0d14;
+      --border: #22293f;
+      --border-focus: #3b82f6;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.2);
+      --blue: #3b82f6;
+      --purple: #8b5cf6;
+      --sidebar-w: 290px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      display: flex;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* Top Banner / Navbar */
+    #top-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 64px;
+      background: rgba(17, 20, 32, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      z-index: 100;
+    }
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: #fff;
+    }
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px var(--emerald-glow);
+    }
+    .brand-title {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .badge-version {
+      font-size: 11px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 7px;
+      border-radius: 12px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .base-url-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 9px;
+      font-size: 13px;
+    }
+    .base-url-selector span {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .url-switch-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 6px;
+      transition: all 0.15s;
+    }
+    .url-switch-btn.active {
+      background: var(--blue);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .btn-nav {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-nav:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .btn-nav.primary {
+      background: var(--emerald);
+      border-color: var(--emerald);
+      color: #042f2e;
+    }
+    .btn-nav.primary:hover {
+      background: #34d399;
+    }
+
+    /* Sidebar Navigation */
+    #sidebar-nav {
+      width: var(--sidebar-w);
+      position: fixed;
+      top: 64px;
+      bottom: 0;
+      left: 0;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .nav-group-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      padding: 0 10px 6px 10px;
+    }
+    .nav-links {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .nav-link:hover {
+      background: var(--bg-surface-elevated);
+      color: #fff;
+    }
+    .nav-link.active {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      font-weight: 600;
+    }
+    .method-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .method-tag.post { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+    .method-tag.get { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+
+    /* Main Content Area */
+    #main-content {
+      margin-left: var(--sidebar-w);
+      margin-top: 64px;
+      flex: 1;
+      padding: 40px 60px 100px 60px;
+      max-width: 1080px;
+    }
+
+    /* Section Headers */
+    .section-wrap {
+      margin-bottom: 56px;
+      scroll-margin-top: 90px;
+    }
+    .section-title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .section-desc {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.7;
+      margin-bottom: 20px;
+    }
+
+    /* Cards */
+    .feature-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    /* Tailscale Showcase Card */
+    .tailscale-box {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 28px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    }
+    .tailscale-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .tailscale-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #34d399;
+    }
+    .pulse-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 10px #10b981;
+      display: inline-block;
+    }
+
+    .tailscale-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .ts-item {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ts-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+    .ts-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: #fff;
+      font-weight: 600;
+      word-break: break-all;
+    }
+    .ts-copy {
+      margin-top: 6px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      font-size: 11.5px;
+      padding: 4px 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .ts-copy:hover {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Endpoint Detailed Box */
+    .endpoint-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 32px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .endpoint-header {
+      padding: 16px 22px;
+      background: var(--bg-surface-elevated);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .endpoint-badge-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .endpoint-url {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .endpoint-body {
+      padding: 22px;
+    }
+
+    /* Code Blocks */
+    .code-container {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin: 14px 0;
+      overflow: hidden;
+    }
+    .code-header {
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .code-content {
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-x: auto;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .btn-copy {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .btn-copy:hover {
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Table Styles */
+    .spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 20px 0;
+      font-size: 13.5px;
+    }
+    .spec-table th {
+      text-align: left;
+      padding: 10px 14px;
+      background: var(--bg-surface-elevated);
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .spec-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-main);
+    }
+    .spec-param {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      color: #93c5fd;
+    }
+    .spec-type {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .spec-req {
+      font-size: 11px;
+      font-weight: 700;
+      color: #f87171;
+      background: rgba(248, 113, 113, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .spec-opt {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* Live API Tester */
+    .tester-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      margin-top: 20px;
+    }
+    .tester-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .tester-input {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+    }
+    .tester-input:focus {
+      border-color: var(--border-focus);
+    }
+    .tester-btn-row {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-test {
+      background: var(--emerald);
+      color: #042f2e;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+    .btn-test:hover {
+      background: #34d399;
+    }
+    .btn-test:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #tester-result {
+      margin-top: 16px;
+      display: none;
+    }
+
+    /* Batch Hero Banner */
+    .batch-hero-banner {
+      background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(168, 85, 247, 0.18) 50%, rgba(16, 185, 129, 0.15) 100%);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+    .batch-hero-text {
+      font-size: 14px;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+    .badge-hot {
+      background: #ef4444;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      margin-left: 6px;
+      display: inline-block;
+    }
+    /* Video Gallery Styles */
+    .video-gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 20px;
+      margin: 20px 0 30px 0;
+    }
+    .video-card {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .video-card:hover {
+      border-color: rgba(59, 130, 246, 0.5);
+      transform: translateY(-2px);
+    }
+    .video-player {
+      width: 100%;
+      height: 240px;
+      background: #000;
+      object-fit: contain;
+      display: block;
+    }
+    .video-card-body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 10px;
+    }
+    .video-card-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: #fff;
+    }
+    .video-prompt-text {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-style: italic;
+      line-height: 1.4;
+      flex: 1;
+    }
+    .video-meta-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .v-tag {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+    }
+    .v-time { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+    .v-res { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; }
+    .v-size { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+    .v-codec { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+    .btn-video-dl {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 7px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+    .btn-video-dl:hover {
+      background: var(--blue);
+      color: #fff;
+      border-color: var(--blue);
+    }
+    .image-preview {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      display: block;
+      background: #000;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .image-preview:hover {
+      transform: scale(1.02);
+    }
+    /* Tabs for tester */
+    .tester-tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+    }
+    .tester-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tester-tab-btn.active {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+    .batch-cards-output {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =========================================================================
+       TOP NAVBAR
+       ========================================================================= -->
+  <header id="top-nav">
+    <div class="brand-wrap">
+      <div class="brand-logo">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+      </div>
+      <span class="brand-title">Agent 3T Global API</span>
+      <span class="badge-version">v1.0.0 Stable</span>
+    </div>
+
+    <div class="top-actions">
+      <!-- Base URL Switcher -->
+      <div class="base-url-selector">
+        <span>Gốc Endpoint:</span>
+        <button class="url-switch-btn active" onclick="setBaseUrl('http://localhost:8765')">Localhost</button>
+        <button class="url-switch-btn" onclick="setBaseUrl('http://100.95.215.84:8765')">Tailscale IP</button>
+        <button class="url-switch-btn" onclick="setBaseUrl('http://macbook-pro-2:8765')">MagicDNS</button>
+      </div>
+
+      <a href="http://localhost:8765" target="_blank" class="btn-nav primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <span>Mở Chat Web UI</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       SIDEBAR NAVIGATION
+       ========================================================================= -->
+  <aside id="sidebar-nav">
+    <div>
+      <div class="nav-group-title">Tổng quan & Mạng</div>
+      <div class="nav-links">
+        <a href="#overview" class="nav-link active">Giới thiệu & Kiến trúc</a>
+        <a href="#tailscale" class="nav-link">
+          <span>🌐 Mạng Tailscale</span>
+          <span class="pulse-dot"></span>
+        </a>
+      </div>
+    </div>
+
+    <div>
+      <div class="nav-group-title">API Endpoints (v1)</div>
+      <div class="nav-links">
+        <a href="#ep-batch-chat" class="nav-link" style="color:#60a5fa;font-weight:600;">
+          <span>Batch Video Song Song</span>
+          <span class="badge-hot">HOT</span>
+        </a>
+        <a href="#video-showcase" class="nav-link">
+          <span>🎬 Video Thực Tế (3 Luồng)</span>
+          <span class="method-tag get">DEMO</span>
+        </a>
+        <a href="#image-showcase" class="nav-link">
+          <span>🎨 Thư Viện Ảnh 2K</span>
+          <span class="method-tag get">NEW</span>
+        </a>
+        <a href="#ep-batch-async" class="nav-link">
+          <span>Batch Queue Nền</span>
+          <span class="method-tag post">POST</span>
+        </a>
+        <a href="#ep-media" class="nav-link">
+          <span>Phát & Tải Video (/media)</span>
+          <span class="method-tag get">GET</span>
+        </a>
+        <a href="#ep-chat" class="nav-link">
+          <span>Gửi Chat & Media</span>
+          <span class="method-tag post">POST</span>
+        </a>
+        <a href="#ep-completions" class="nav-link">
+          <span>OpenAI Format</span>
+          <span class="method-tag post">POST</span>
+        </a>
+        <a href="#ep-threads" class="nav-link">
+          <span>Danh sách Threads</span>
+          <span class="method-tag get">GET</span>
+        </a>
+        <a href="#ep-switch" class="nav-link">
+          <span>Chuyển Thread</span>
+          <span class="method-tag post">POST</span>
+        </a>
+        <a href="#ep-new-thread" class="nav-link">
+          <span>Tạo Thread Mới</span>
+          <span class="method-tag post">POST</span>
+        </a>
+        <a href="#ep-history" class="nav-link">
+          <span>Lịch sử tin nhắn</span>
+          <span class="method-tag get">GET</span>
+        </a>
+        <a href="#ep-upload" class="nav-link">
+          <span>Upload File</span>
+          <span class="method-tag post">POST</span>
+        </a>
+        <a href="#ep-status" class="nav-link">
+          <span>Trạng thái kết nối</span>
+          <span class="method-tag get">GET</span>
+        </a>
+      </div>
+    </div>
+
+    <div>
+      <div class="nav-group-title">Tích hợp Code Mẫu</div>
+      <div class="nav-links">
+        <a href="#snippet-colab" class="nav-link">Google Colab Pipeline</a>
+        <a href="#snippet-telegram" class="nav-link">Bot Telegram Video</a>
+        <a href="#snippet-openai-sdk" class="nav-link">OpenAI Python SDK</a>
+      </div>
+    </div>
+
+    <div>
+      <div class="nav-group-title">Công cụ</div>
+      <div class="nav-links">
+        <a href="#tester" class="nav-link">⚡ Live API Tester</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- =========================================================================
+       MAIN CONTENT
+       ========================================================================= -->
+  <main id="main-content">
+
+    <!-- HERO HIGHLIGHT BANNER: BATCH VIDEO ENGINE -->
+    <div class="batch-hero-banner">
+      <div class="batch-hero-text">
+        <span style="font-weight:700;color:#60a5fa;font-size:15px;">🚀 ĐẶC TẢ CHUẨN: BATCH VIDEO GENERATION PIPELINE (MULTI-WORKER)</span><br>
+        Hệ thống hỗ trợ chạy <strong>song song không giới hạn luồng video</strong> thông qua session cookie Meta Hatch. Trả về trực tiếp URL file MP4 chuẩn H.264 với tốc độ ~76s cho 3 video song song.
+      </div>
+      <a href="#ep-batch-chat" class="btn-nav primary" style="white-space:nowrap;padding:8px 16px;text-decoration:none;">
+        Xem API & Video Mẫu →
+      </a>
+    </div>
+
+    <!-- 1. OVERVIEW -->
+    <section id="overview" class="section-wrap">
+      <h1 class="section-title">
+        <span>Tài liệu REST API Agent 3T Global (In-Browser Bridge)</span>
+      </h1>
+      <p class="section-desc">
+        Hệ thống RPC Bridge Server cho phép bạn điều khiển và khai thác toàn bộ sức mạnh tạo Video TVC, Ảnh và Chat của <strong>Agent 3T Global</strong> thông qua chuẩn REST API hiện đại. 
+        Bạn có thể gọi trực tiếp từ <strong>Google Colab, VPS từ xa, bot Telegram, kịch bản Python hoặc ứng dụng Web/Mobile</strong> mà không cần mở trình duyệt thao tác bằng tay.
+      </p>
+
+      <div class="feature-card">
+        <h3 style="color:#fff;margin-bottom:10px;font-size:16px;">✨ Tính năng & Ưu điểm vượt trội:</h3>
+        <ul style="margin-left: 20px; color: var(--text-muted); font-size: 14.5px; line-height: 1.8;">
+          <li><strong>Bỏ qua độ trễ gõ phím:</strong> Tương tác trực tiếp với State Dispatcher của React composer trong trang Agent 3T Global, không phụ thuộc vào typing simulation.</li>
+          <li><strong>Tự động trích xuất Video & Giải phóng Blob:</strong> Video TVC được tạo trong session gốc dạng <code style="color:#93c5fd;">blob:https://muse.ai/...</code> được bridge tự động trích xuất dữ liệu nhị phân (Binary), lưu thành file MP4 hoàn chỉnh và cung cấp URL HTTP stream trực tiếp.</li>
+          <li><strong>Hỗ trợ chuẩn OpenAI:</strong> Cung cấp endpoint <code style="color:#34d399;">/v1/chat/completions</code> tương thích 100% với OpenAI SDK, LangChain, Cursor, Cline.</li>
+          <li><strong>Quản lý Conversation Threads:</strong> Liệt kê, chuyển đổi và bắt đầu thread mới hoàn toàn qua API.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 2. TAILSCALE NETWORK ACCESS -->
+    <section id="tailscale" class="section-wrap">
+      <h2 class="section-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+        <span>Mạng Tailscale — Cắm API & UI từ mọi nơi</span>
+      </h2>
+      <p class="section-desc">
+        Server Agent 3T Global đang lắng nghe trên tất cả các network interface (<code style="color:#93c5fd;">0.0.0.0:8765</code>).
+        Máy chủ đã kết nối vào mạng Tailscale riêng của bạn. Bất kỳ máy nào trong mạng Tailnet (Google Colab, VPS, Laptop khác, Điện thoại) đều có thể truy cập ngay lập tức:
+      </p>
+
+      <div class="tailscale-box">
+        <div class="tailscale-header">
+          <div class="tailscale-title">
+            <span class="pulse-dot"></span>
+            <span>Thông tin kết nối Tailscale (Đang hoạt động)</span>
+          </div>
+          <span style="font-size:12px;background:rgba(16,185,129,0.2);color:#34d399;padding:3px 9px;border-radius:6px;font-weight:600;">Port: 8765 Active</span>
+        </div>
+
+        <div class="tailscale-grid">
+          <div class="ts-item">
+            <span class="ts-label">Địa chỉ IP Tailscale</span>
+            <span class="ts-val" id="ts-ip-val">100.95.215.84</span>
+            <button class="ts-copy" onclick="copyText('100.95.215.84', this)">Sao chép IP</button>
+          </div>
+
+          <div class="ts-item">
+            <span class="ts-label">Tên máy MagicDNS</span>
+            <span class="ts-val" id="ts-dns-val">macbook-pro-2</span>
+            <button class="ts-copy" onclick="copyText('macbook-pro-2', this)">Sao chép Tên máy</button>
+          </div>
+
+          <div class="ts-item">
+            <span class="ts-label">URL API Trực Tiếp</span>
+            <span class="ts-val" id="ts-url-val">http://100.95.215.84:8765</span>
+            <button class="ts-copy" onclick="copyText('http://100.95.215.84:8765', this)">Sao chép Base URL</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <h4 style="color:#fff;margin-bottom:8px;font-size:15px;">🔗 Cách cắm từ Google Colab hoặc Server ngoài:</h4>
+        <p style="color:var(--text-muted);font-size:14px;margin-bottom:10px;">
+          Trên Google Colab / VPS, chỉ cần cài đặt Tailscale và đăng nhập cùng tài khoản Tailscale (<code style="color:#93c5fd;">minhthai1995@</code>). Sau đó Colab có thể gọi thẳng tới máy Mac:
+        </p>
+        <div class="code-container">
+          <div class="code-header">
+            <span>Cài đặt & Kết nối Tailscale trên Google Colab</span>
+            <button class="btn-copy" onclick="copySnippet('code-colab-setup')">Sao chép</button>
+          </div>
+          <pre class="code-content" id="code-colab-setup"># Chạy trong 1 cell của Google Colab:
+!curl -fsSL https://tailscale.com/install.sh | sh
+!tailscale up --qr
+
+# Sau khi kết nối thành công, kiểm tra ping tới máy Mac:
+!curl -s http://100.95.215.84:8765/v1/status</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. ENDPOINT: /v1/chat -->
+    <section id="ep-chat" class="section-wrap">
+      <div class="endpoint-card">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag post" style="font-size:13px;padding:4px 10px;">POST</span>
+            <span class="endpoint-url">/v1/chat</span>
+          </div>
+          <span style="font-size:13px;color:var(--text-dim);">Gửi prompt & Sinh Video/Ảnh</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">
+            Endpoint cốt lõi dùng để tương tác với Agent 3T Global. Nhận câu lệnh prompt và danh sách file ảnh/video đính kèm. 
+            Hệ thống sẽ giữ connection cho đến khi Agent 3T Global sinh hoàn tất toàn bộ nội dung văn bản và render xong Video TVC (MP4), sau đó trả về kết quả gồm nội dung và đường dẫn file video để tải/phát.
+          </p>
+
+          <h4 style="color:#fff;margin:16px 0 8px 0;font-size:14px;">Tham số Request (JSON hoặc Multipart):</h4>
+          <table class="spec-table">
+            <thead>
+              <tr>
+                <th>Tham số</th>
+                <th>Kiểu dữ liệu</th>
+                <th>Bắt buộc</th>
+                <th>Mô tả</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="spec-param">prompt</td>
+                <td class="spec-type">string</td>
+                <td><span class="spec-req">BẮT BUỘC*</span></td>
+                <td>Câu lệnh prompt cho Agent 3T Global (có thể bỏ trống nếu đã gửi file ảnh/video).</td>
+              </tr>
+              <tr>
+                <td class="spec-param">files</td>
+                <td class="spec-type">array | file</td>
+                <td><span class="spec-opt">TÙY CHỌN</span></td>
+                <td>File ảnh / video đính kèm (multipart upload, đường dẫn cục bộ, hoặc Base64).</td>
+              </tr>
+              <tr>
+                <td class="spec-param">thread_id</td>
+                <td class="spec-type">string | int</td>
+                <td><span class="spec-opt">TÙY CHỌN</span></td>
+                <td>ID hoặc chỉ số thread muốn gửi vào (ví dụ: <code style="color:#93c5fd;">"thread_0"</code>, <code style="color:#93c5fd;">1</code>).</td>
+              </tr>
+              <tr>
+                <td class="spec-param">new_thread</td>
+                <td class="spec-type">boolean</td>
+                <td><span class="spec-opt">TÙY CHỌN</span></td>
+                <td>Nếu <code style="color:#34d399;">true</code>, tự động mở một thread chat mới trước khi gửi.</td>
+              </tr>
+              <tr>
+                <td class="spec-param">timeout_ms</td>
+                <td class="spec-type">int</td>
+                <td><span class="spec-opt">TÙY CHỌN</span></td>
+                <td>Thời gian chờ tối đa (mặc định: 180000ms = 3 phút, đủ cho video render).</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Example — Gửi Prompt tạo TVC 15s</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-chat', '/v1/chat')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-chat">curl -X POST {BASE_URL}/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Tạo video TVC 15s cho căn nhà này với sân thượng mát mẻ"
+  }'</pre>
+          </div>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Example — Đính kèm File Ảnh / Video vào Prompt</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-chat-file', '/v1/chat')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-chat-file">curl -X POST {BASE_URL}/v1/chat \
+  -F "prompt=Tạo video quảng cáo TVC 30s cho sản phẩm này" \
+  -F "files=@/duong/dan/san_pham.png"</pre>
+          </div>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span>Cấu trúc JSON phản hồi thành công (200 OK)</span>
+              <button class="btn-copy" onclick="copySnippet('snippet-chat-resp')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-chat-resp">{
+  "ok": true,
+  "content": "Đây là bản ngắn cho TVC căn nhà:\n\nBạn có muốn mình chèn thêm chữ như \"Sân thượng chill - Sống xanh mỗi ngày\" không?",
+  "media": [
+    "/media/muse_37b8d555_0.mp4"
+  ],
+  "duration_ms": 76400,
+  "status": "completed"
+}</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. ENDPOINT: /v1/chat/completions (OpenAI format) -->
+    <section id="ep-completions" class="section-wrap">
+      <div class="endpoint-card">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag post" style="font-size:13px;padding:4px 10px;">POST</span>
+            <span class="endpoint-url">/v1/chat/completions</span>
+          </div>
+          <span style="font-size:13px;color:#34d399;font-weight:600;">⚡ Chuẩn OpenAI Drop-in SDK</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">
+            Cung cấp giao diện chuẩn OpenAI Chat Completions. Bạn có thể truyền Base URL này vào bất kỳ thư viện nào hỗ trợ OpenAI (<code style="color:#93c5fd;">openai</code> Python, LangChain, LlamaIndex, LiteLLM, v.v.).
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span>Python Example — Sử dụng thư viện `openai`</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-py-openai', '')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-py-openai">from openai import OpenAI
+
+# Kết nối trực tiếp qua Tailscale IP hoặc Localhost:
+client = OpenAI(
+    base_url="{BASE_URL}/v1",
+    api_key="none"
+)
+
+response = client.chat.completions.create(
+    model="muse-ai",
+    messages=[
+        {"role": "user", "content": "Tạo kịch bản TVC 15s Mỳ Quảng"}
+    ]
+)
+
+print(response.choices[0].message.content)</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4.1. ENDPOINT: /v1/batch/chat (Parallel Batch Video Generation) -->
+    <section id="ep-batch-chat" class="section-wrap">
+      <div class="endpoint-card">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag post" style="font-size:13px;padding:4px 10px;">POST</span>
+            <span class="endpoint-url">/v1/batch/chat</span>
+          </div>
+          <span style="font-size:13px;color:#38bdf8;font-weight:600;">🚀 Batch Video Song Song (Multi-Worker Concurrency)</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">
+            Endpoint đột phá cho phép tạo <strong>nhiều video cùng một lúc song song</strong> bằng kiến trúc Multi-Worker Pages độc lập. 
+            Mỗi câu lệnh tạo video được phân bổ cho một luồng Worker riêng biệt với session isolation tuyệt đối, khai thác trọn vẹn băng thông backend Meta Hatch 
+            thay vì bị giới hạn tuần tự từng video một như trên giao diện web thông thường.
+          </p>
+
+          <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 12px 16px; margin: 14px 0 18px 0; font-size: 13.5px; line-height: 1.6;">
+            <strong style="color: #34d399;">🌟 Hỗ Trợ Đính Kèm File / Ảnh Nhà Đất Song Song (Image-to-Video):</strong><br>
+            Hệ thống hỗ trợ truyền kèm ảnh căn nhà, thiết kế nội thất hoặc sản phẩm affiliate dưới dạng <strong>Data-URL Base64</strong> (<code>data:image/jpeg;base64,...</code>), URL ảnh trực tiếp hoặc raw base64. 
+            Mỗi worker độc lập tự bóc tách ảnh, đính kèm vào composer của worker tương ứng trước khi gửi prompt. Giới hạn payload đã được mở rộng lên <strong>100MB</strong>.
+          </div>
+
+          <h4 style="color:#fff;margin:16px 0 8px 0;font-size:14px;">Tham số Request (JSON Body):</h4>
+          <table class="spec-table">
+            <thead>
+              <tr>
+                <th>Tham số</th>
+                <th>Kiểu dữ liệu</th>
+                <th>Bắt buộc</th>
+                <th>Mặc định</th>
+                <th>Mô tả</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="spec-param">items</td>
+                <td class="spec-type">object[]</td>
+                <td><span class="spec-req">KHUYÊN DÙNG</span></td>
+                <td>-</td>
+                <td>
+                  Mảng các item độc lập. Mỗi item gồm:<br>
+                  - <code>prompt</code> (string, bắt buộc): Câu lệnh sinh video.<br>
+                  - <code>files</code> (string[], tùy chọn): Mảng ảnh/file đính kèm dạng Data-URL (<code>data:image/jpeg;base64,...</code>) hoặc link HTTP/HTTPS.
+                </td>
+              </tr>
+              <tr>
+                <td class="spec-param">prompts</td>
+                <td class="spec-type">string[]</td>
+                <td><span class="spec-opt">TÙY CHỌN</span></td>
+                <td>-</td>
+                <td>Mảng danh sách các câu lệnh văn bản (thay thế cho <code>items</code> khi chỉ tạo video text-to-video thuần túy).</td>
+              </tr>
+              <tr>
+                <td class="spec-param">files</td>
+                <td class="spec-type">string[][]</td>
+                <td><span class="spec-opt">TÙY CHỌN</span></td>
+                <td>-</td>
+                <td>Mảng các danh sách file tương ứng với từng prompt khi sử dụng tham số <code>prompts</code>.</td>
+              </tr>
+              <tr>
+                <td class="spec-param">concurrency</td>
+                <td class="spec-type">integer</td>
+                <td><span class="spec-opt">TÙY CHỌN</span></td>
+                <td><code style="color:#34d399;">2</code></td>
+                <td>Số lượng worker/trang Playwright chạy song song (hỗ trợ từ <strong>1 đến 5</strong> luồng).</td>
+              </tr>
+              <tr>
+                <td class="spec-param">timeout_ms</td>
+                <td class="spec-type">integer</td>
+                <td><span class="spec-opt">TÙY CHỌN</span></td>
+                <td><code style="color:#34d399;">180000</code></td>
+                <td>Thời gian chờ tối đa cho mỗi video (mặc định 180,000ms = 3 phút).</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Example 1: Dùng "items" kèm Ảnh Căn Nhà (Base64 Data-URL) — Khuyên Dùng Cho Bất Động Sản</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-batch-items', '/v1/batch/chat')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-batch-items">curl -X POST {BASE_URL}/v1/batch/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {
+        "prompt": "Tạo video TVC 5s góc máy flycam lướt vào phòng khách căn biệt thự này, ánh sáng ấm cúng",
+        "files": ["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."]
+      },
+      {
+        "prompt": "Tạo video TVC 5s lia máy từ ban công nhìn ra hồ bơi căn penhouse này lúc hoàng hôn",
+        "files": ["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."]
+      }
+    ],
+    "concurrency": 2,
+    "timeout_ms": 300000
+  }'</pre>
+          </div>
+
+          <div class="code-container" style="margin-top:16px;">
+            <div class="code-header">
+              <span>cURL Example 2: Dùng "prompts" sinh 3 Video Song Song (Text-to-Video Thuần Túy)</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-batch-chat', '/v1/batch/chat')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-batch-chat">curl -X POST {BASE_URL}/v1/batch/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompts": [
+      "Tạo video TVC 5s ly cà phê sữa đá nhỏ giọt buổi sáng",
+      "Tạo video TVC 5s chiếc đồng hồ đeo tay cơ học sang trọng chuyển động",
+      "Tạo video TVC 5s sóng biển vỗ vào bãi cát trắng hoàng hôn"
+    ],
+    "concurrency": 3,
+    "timeout_ms": 300000
+  }'</pre>
+          </div>
+
+          <h4 style="color:#fff;margin:20px 0 8px 0;font-size:14px;">Cấu trúc Response Trả Về (JSON):</h4>
+          <div class="code-container">
+            <div class="code-header">
+              <span>Response Payload Thực Tế (Hoàn tất 3 video chỉ trong 76 giây)</span>
+              <button class="btn-copy" onclick="copySnippet('snippet-resp-batch-chat')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-resp-batch-chat">{
+  "ok": true,
+  "total": 3,
+  "completed": 3,
+  "failed": 0,
+  "results": [
+    {
+      "ok": true,
+      "prompt": "Tạo video TVC 5s ly cà phê sữa đá nhỏ giọt buổi sáng",
+      "content": "Video TVC 5s đã xong: phin cà phê nhỏ giọt xuống ly sữa, ánh nắng buổi sáng...",
+      "media": ["/media/muse_696d3fd9_0.mp4"],
+      "duration_ms": 51620,
+      "status": "completed"
+    },
+    {
+      "ok": true,
+      "prompt": "Tạo video TVC 5s chiếc đồng hồ đeo tay cơ học sang trọng chuyển động",
+      "content": "Video TVC 5s đồng hồ cơ sang trọng đã xong...",
+      "media": ["/media/muse_85bf5ce6_0.mp4"],
+      "duration_ms": 41610,
+      "status": "completed"
+    },
+    {
+      "ok": true,
+      "prompt": "Tạo video TVC 5s sóng biển vỗ vào bãi cát trắng hoàng hôn",
+      "content": "Video 5s đã xong 🌅",
+      "media": ["/media/muse_e32b5da4_0.mp4"],
+      "duration_ms": 70690,
+      "status": "completed"
+    }
+  ]
+}</pre>
+          </div>
+
+          <h4 style="color:#fff;margin:20px 0 8px 0;font-size:14px;">Thông số kỹ thuật của File Video MP4 được tạo:</h4>
+          <table class="spec-table">
+            <thead>
+              <tr>
+                <th>Định dạng</th>
+                <th>Video Codec</th>
+                <th>Độ phân giải</th>
+                <th>Bitrate</th>
+                <th>Khả năng tương thích</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>MP4 Container</strong></td>
+                <td><code style="color:#93c5fd;">H.264 (High Profile)</code></td>
+                <td><strong>720x1280 (9:16 Dọc)</strong> hoặc <strong>1280x720 (16:9 Ngang)</strong></td>
+                <td>~4,000 - 5,800 kbps (24-30 fps)</td>
+                <td>Tương thích 100% với HTML5 Player, Telegram, TikTok, Shorts, Reels, QuickTime, VLC.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Video Showcase Gallery -->
+          <div id="video-showcase" style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border);">
+            <h4 style="color:#fff;margin:0 0 10px 0;font-size:16px;display:flex;align-items:center;gap:8px;">
+              <span>🎬 Thư Viện Video Thực Tế (Benchmark 3 Luồng Song Song Hoàn Tất trong 76.8s)</span>
+            </h4>
+            <p class="section-desc" style="margin-bottom:16px;">
+              Dưới đây là 3 video MP4 thực tế được sinh đồng thời bằng lệnh <code>POST /v1/batch/chat</code> (concurrency = 3). 
+              File được giải mã trực tiếp từ bộ nhớ blob của trình duyệt sang MP4, lưu trữ tại thư mục media và hỗ trợ phát trực tiếp:
+            </p>
+
+            <div class="video-gallery-grid">
+              <!-- Card 1 -->
+              <div class="video-card">
+                <video class="video-player" controls preload="metadata" poster="/media/thumb_stream_1.jpg">
+                  <source src="/media/muse_696d3fd9_0.mp4" type="video/mp4">
+                  Trình duyệt không hỗ trợ thẻ video.
+                </video>
+                <div class="video-card-body">
+                  <div class="video-card-title">☕ TVC Ly Cà Phê Sữa Đá (5s)</div>
+                  <div class="video-prompt-text">"Tạo video TVC 5s ly cà phê sữa đá nhỏ giọt buổi sáng"</div>
+                  <div class="video-meta-tags">
+                    <span class="v-tag v-time">⏱️ 51.6s</span>
+                    <span class="v-tag v-res">📐 720x1280 (9:16)</span>
+                    <span class="v-tag v-size">💾 2.44 MB</span>
+                    <span class="v-tag v-codec">🎞️ H.264 / 24fps</span>
+                  </div>
+                  <a href="/media/muse_696d3fd9_0.mp4" target="_blank" download class="btn-video-dl">
+                    ⬇️ Tải Video MP4
+                  </a>
+                </div>
+              </div>
+
+              <!-- Card 2 -->
+              <div class="video-card">
+                <video class="video-player" controls preload="metadata" poster="/media/thumb_stream_2.jpg">
+                  <source src="/media/muse_85bf5ce6_0.mp4" type="video/mp4">
+                  Trình duyệt không hỗ trợ thẻ video.
+                </video>
+                <div class="video-card-body">
+                  <div class="video-card-title">⌚ TVC Đồng Hồ Cơ Sang Trọng (10s)</div>
+                  <div class="video-prompt-text">"Tạo video TVC 5s chiếc đồng hồ đeo tay cơ học sang trọng chuyển động"</div>
+                  <div class="video-meta-tags">
+                    <span class="v-tag v-time">⏱️ 41.6s</span>
+                    <span class="v-tag v-res">📐 720x1280 (9:16)</span>
+                    <span class="v-tag v-size">💾 5.29 MB</span>
+                    <span class="v-tag v-codec">🎞️ H.264 / 24fps</span>
+                  </div>
+                  <a href="/media/muse_85bf5ce6_0.mp4" target="_blank" download class="btn-video-dl">
+                    ⬇️ Tải Video MP4
+                  </a>
+                </div>
+              </div>
+
+              <!-- Card 3 -->
+              <div class="video-card">
+                <video class="video-player" controls preload="metadata" poster="/media/thumb_stream_3.jpg">
+                  <source src="/media/muse_e32b5da4_0.mp4" type="video/mp4">
+                  Trình duyệt không hỗ trợ thẻ video.
+                </video>
+                <div class="video-card-body">
+                  <div class="video-card-title">🌅 TVC Sóng Biển Hoàng Hôn (10s)</div>
+                  <div class="video-prompt-text">"Tạo video TVC 5s sóng biển vỗ vào bãi cát trắng hoàng hôn"</div>
+                  <div class="video-meta-tags">
+                    <span class="v-tag v-time">⏱️ 70.6s</span>
+                    <span class="v-tag v-res">📐 1280x720 (16:9)</span>
+                    <span class="v-tag v-size">💾 6.94 MB</span>
+                    <span class="v-tag v-codec">🎞️ H.264 / 24fps</span>
+                  </div>
+                  <a href="/media/muse_e32b5da4_0.mp4" target="_blank" download class="btn-video-dl">
+                    ⬇️ Tải Video MP4
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Image Showcase Gallery & Specifications -->
+          <div id="image-showcase" style="margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--border);">
+            <h4 style="color:#fff;margin:0 0 10px 0;font-size:16px;display:flex;align-items:center;gap:8px;">
+              <span>🎨 Thư Viện Ảnh Đã Sinh Thực Tế (Benchmark Ảnh 2K & Full HD+ Siêu Nét)</span>
+              <span class="badge-hot" style="background:#10b981;">ĐÃ XÁC THỰC 100%</span>
+            </h4>
+            <p class="section-desc" style="margin-bottom:14px;">
+              Agent 3T Global <strong>hoàn toàn tạo được ảnh chất lượng cao</strong> (cả khung ngang lẫn khung dọc 9:16). 
+              Tốc độ sinh ảnh cực nhanh chỉ từ <strong>20s đến 33s</strong>, xuất file định dạng <strong>WebP</strong> độ nét cao (~1920x1280 và 1152x2048). 
+              Hệ thống tự động giải phóng blob nhị phân từ phiên làm việc và lưu file về <code>/media/</code>:
+            </p>
+
+            <table class="spec-table">
+              <thead>
+                <tr>
+                  <th>Định dạng</th>
+                  <th>Độ phân giải</th>
+                  <th>Thời gian sinh</th>
+                  <th>Dung lượng</th>
+                  <th>Đặc điểm kỹ thuật</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code style="color:#34d399;">WebP</code></td>
+                  <td><strong>1920x1280 (Ngang)</strong> / <strong>1152x2048 (Dọc 9:16 2K)</strong></td>
+                  <td><strong>~20s - 33s</strong> (nhanh gấp đôi video)</td>
+                  <td>~350 - 610 KB</td>
+                  <td>Màu sắc chân thực, chi tiết sắc nét, tương thích 100% trình duyệt, mobile & app.</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="video-gallery-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+              <!-- Image Card 1 -->
+              <div class="video-card">
+                <a href="/media/muse_91dc1509_0.webp" target="_blank">
+                  <img src="/media/muse_91dc1509_0.webp" alt="Tách trà hoa cúc" class="image-preview" />
+                </a>
+                <div class="video-card-body">
+                  <div class="video-card-title">🍵 Tách Trà Hoa Cúc Mộc Mạc</div>
+                  <div class="video-prompt-text">"Tạo một bức ảnh chụp một tách trà hoa cúc nóng trên bàn gỗ mộc mạc"</div>
+                  <div class="video-meta-tags">
+                    <span class="v-tag v-time">⏱️ 20.5s</span>
+                    <span class="v-tag v-res">📐 1920x1280</span>
+                    <span class="v-tag v-size">💾 477 KB</span>
+                  </div>
+                  <a href="/media/muse_91dc1509_0.webp" target="_blank" download class="btn-video-dl">
+                    🔍 Xem Ảnh Gốc (Full HD)
+                  </a>
+                </div>
+              </div>
+
+              <!-- Image Card 2 -->
+              <div class="video-card">
+                <a href="/media/muse_bdc9a624_0.webp" target="_blank">
+                  <img src="/media/muse_bdc9a624_0.webp" alt="Siêu xe thể thao dưới mưa" class="image-preview" />
+                </a>
+                <div class="video-card-body">
+                  <div class="video-card-title">🏎️ Siêu Xe Thể Thao Đêm Mưa</div>
+                  <div class="video-prompt-text">"Tạo một bức ảnh chụp chiếc ô tô thể thao màu đỏ bóng loáng đỗ dưới trời mưa ban đêm"</div>
+                  <div class="video-meta-tags">
+                    <span class="v-tag v-time">⏱️ 22.5s (Batch)</span>
+                    <span class="v-tag v-res">📐 1920x1280</span>
+                    <span class="v-tag v-size">💾 476 KB</span>
+                  </div>
+                  <a href="/media/muse_bdc9a624_0.webp" target="_blank" download class="btn-video-dl">
+                    🔍 Xem Ảnh Gốc (Full HD)
+                  </a>
+                </div>
+              </div>
+
+              <!-- Image Card 3 -->
+              <div class="video-card">
+                <a href="/media/muse_9de95a7d_0.webp" target="_blank">
+                  <img src="/media/muse_9de95a7d_0.webp" alt="Đĩa sushi cá hồi Nhật Bản" class="image-preview" />
+                </a>
+                <div class="video-card-body">
+                  <div class="video-card-title">🍣 Đĩa Sushi Cá Hồi Kiểu Nhật</div>
+                  <div class="video-prompt-text">"Tạo một bức ảnh chụp đĩa sushi cá hồi tươi ngon trang trí trên thớt gỗ đen"</div>
+                  <div class="video-meta-tags">
+                    <span class="v-tag v-time">⏱️ 33.5s (Batch)</span>
+                    <span class="v-tag v-res">📐 1920x1280</span>
+                    <span class="v-tag v-size">💾 610 KB</span>
+                  </div>
+                  <a href="/media/muse_9de95a7d_0.webp" target="_blank" download class="btn-video-dl">
+                    🔍 Xem Ảnh Gốc (Full HD)
+                  </a>
+                </div>
+              </div>
+
+              <!-- Image Card 4 -->
+              <div class="video-card">
+                <a href="/media/muse_7d4a0d0f_0.webp" target="_blank">
+                  <img src="/media/muse_7d4a0d0f_0.webp" alt="Chân dung áo dài nón lá" class="image-preview" style="object-position: center top;" />
+                </a>
+                <div class="video-card-body">
+                  <div class="video-card-title">🌸 Chân Dung Áo Dài (Khung Dọc 9:16)</div>
+                  <div class="video-prompt-text">"Tạo một bức ảnh chân dung dọc (tỉ lệ 9:16) người mẫu nữ áo dài trắng đội nón lá hoa sen"</div>
+                  <div class="video-meta-tags">
+                    <span class="v-tag v-time">⏱️ 31.0s</span>
+                    <span class="v-tag v-res">📐 1152x2048 (2K)</span>
+                    <span class="v-tag v-size">💾 344 KB</span>
+                  </div>
+                  <a href="/media/muse_7d4a0d0f_0.webp" target="_blank" download class="btn-video-dl">
+                    🔍 Xem Ảnh Gốc (2K Dọc)
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4.2. ENDPOINT: /v1/batch/async & /v1/batch/status (Background Queue) -->
+    <section id="ep-batch-async" class="section-wrap">
+      <div class="endpoint-card">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag post" style="font-size:13px;padding:4px 10px;">POST</span>
+            <span class="endpoint-url">/v1/batch/async</span>
+            <span class="method-tag get" style="font-size:13px;padding:4px 10px;margin-left:6px;">GET</span>
+            <span class="endpoint-url">/v1/batch/status</span>
+          </div>
+          <span style="font-size:13px;color:#a855f7;font-weight:600;">⚡ Batch Hàng Đợi Nền (Non-blocking Asynchronous Queue)</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">
+            Dành cho kịch bản chạy <strong>hàng chục đến hàng trăm video lớn</strong> từ Google Colab hoặc hệ thống tự động mà không muốn client phải treo giữ kết nối HTTP liên tục. 
+            Server nhận yêu cầu và lập tức trả về <code>batch_id</code> trong 50ms, sau đó các worker xử lý nền. Client định kỳ polling kiểm tra tiến độ và nhận link tải video khi hoàn tất.
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span>Bước 1: Gửi Batch Job vào hàng đợi nền (Hỗ trợ "items" kèm file ảnh Base64 hoặc "prompts")</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-batch-async-send', '/v1/batch/async')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-batch-async-send">curl -X POST {BASE_URL}/v1/batch/async \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {
+        "prompt": "Tạo video TVC 10s máy hàn điện tử mini hoạt động thực tế, tia lửa sáng",
+        "files": ["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."]
+      },
+      {
+        "prompt": "Tạo video TVC 10s máy mài góc cầm tay cắt kim loại",
+        "files": ["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."]
+      },
+      {
+        "prompt": "Tạo video TVC 10s máy cưa đĩa đa năng xẻ gỗ mượt mà",
+        "files": ["data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD..."]
+      }
+    ],
+    "concurrency": 3
+  }'</pre>
+          </div>
+
+          <p style="font-size:13.5px;color:var(--text-muted);margin:12px 0 6px 0;">Phản hồi tức thì từ server:</p>
+          <pre class="code-content" style="background:#080a10;border:1px solid var(--border);border-radius:8px;">{
+  "ok": true,
+  "batch_id": "batch_9f81a7b2",
+  "status": "running",
+  "total": 3,
+  "status_url": "/v1/batch/status?id=batch_9f81a7b2"
+}</pre>
+
+          <div class="code-container" style="margin-top:20px;">
+            <div class="code-header">
+              <span>Bước 2: Kiểm tra tiến độ và lấy danh sách video đã hoàn tất</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-batch-async-status', '/v1/batch/status?id=batch_9f81a7b2')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-batch-async-status">curl "{BASE_URL}/v1/batch/status?id=batch_9f81a7b2"</pre>
+          </div>
+
+          <p style="font-size:13.5px;color:var(--text-muted);margin:12px 0 6px 0;">Dữ liệu khi trạng thái chuyển sang <code>completed</code>:</p>
+          <pre class="code-content" style="background:#080a10;border:1px solid var(--border);border-radius:8px;">{
+  "ok": true,
+  "batch_id": "batch_9f81a7b2",
+  "status": "completed",
+  "total": 3,
+  "completed": 3,
+  "failed": 0,
+  "concurrency": 3,
+  "created_at": 1790520340.12,
+  "finished_at": 1790520416.92,
+  "results": [
+    { "ok": true, "prompt": "Video TVC 10s...", "media": ["/media/muse_xxx_0.mp4"] },
+    { "ok": true, "prompt": "Video TVC 10s...", "media": ["/media/muse_yyy_0.mp4"] },
+    { "ok": true, "prompt": "Video TVC 10s...", "media": ["/media/muse_zzz_0.mp4"] }
+  ]
+}</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4.3. ENDPOINT: /media/{filename} (HTTP Byte-Range Video Streaming) -->
+    <section id="ep-media" class="section-wrap">
+      <div class="endpoint-card">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag get" style="font-size:13px;padding:4px 10px;">GET</span>
+            <span class="endpoint-url">/media/{filename}.mp4</span>
+          </div>
+          <span style="font-size:13px;color:#34d399;font-weight:600;">🎞️ Phát & Tải Video Trực Tiếp (HTTP Byte-Range Streaming)</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">
+            Cung cấp video MP4 đã sinh với đầy đủ tính năng <strong>HTTP Range Requests (RFC 7233)</strong> qua header <code>Accept-Ranges: bytes</code>. 
+            Client có thể tua đến bất kỳ giây nào mà không cần tải hết toàn bộ file, nhúng trực tiếp vào thẻ <code>&lt;video&gt;</code> HTML5, phát qua Telegram Bot hoặc tải về lưu trữ.
+          </p>
+
+          <table class="spec-table">
+            <thead>
+              <tr>
+                <th>Header</th>
+                <th>Giá trị</th>
+                <th>Ý nghĩa kỹ thuật</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="spec-param">Accept-Ranges</td>
+                <td class="spec-type">bytes</td>
+                <td>Hỗ trợ tải từng đoạn byte, cho phép player HTML5 tua video mượt mà (seeking/scrubbing).</td>
+              </tr>
+              <tr>
+                <td class="spec-param">Content-Type</td>
+                <td class="spec-type">video/mp4</td>
+                <td>Định dạng container MP4 chuẩn tương thích đa nền tảng.</td>
+              </tr>
+              <tr>
+                <td class="spec-param">Content-Length</td>
+                <td class="spec-type">integer</td>
+                <td>Kích thước file chính xác tính bằng byte.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Header Check Example</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-media', '/media/muse_696d3fd9_0.mp4')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-media">curl -I {BASE_URL}/media/muse_696d3fd9_0.mp4</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. ENDPOINT: /v1/threads & /v1/threads/switch -->
+    <section id="ep-threads" class="section-wrap">
+      <div class="endpoint-card">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag get" style="font-size:13px;padding:4px 10px;">GET</span>
+            <span class="endpoint-url">/v1/threads</span>
+          </div>
+          <span style="font-size:13px;color:var(--text-dim);">Lấy danh sách cuộc trò chuyện</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">Trả về toàn bộ danh sách các thread/side-chats hiển thị trên sidebar của Agent 3T Global.</p>
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Example</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-threads', '/v1/threads')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-threads">curl {BASE_URL}/v1/threads</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint-card" id="ep-switch">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag post" style="font-size:13px;padding:4px 10px;">POST</span>
+            <span class="endpoint-url">/v1/threads/switch</span>
+          </div>
+          <span style="font-size:13px;color:var(--text-dim);">Chuyển đổi thread active</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">Chuyển đổi phiên chat đang chọn trên Agent 3T Global và nạp toàn bộ tin nhắn + media của thread đó.</p>
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Example</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-switch', '/v1/threads/switch')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-switch">curl -X POST {BASE_URL}/v1/threads/switch \
+  -H "Content-Type: application/json" \
+  -d '{"thread_id": "thread_1"}'</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint-card" id="ep-new-thread">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag post" style="font-size:13px;padding:4px 10px;">POST</span>
+            <span class="endpoint-url">/v1/threads/new</span>
+          </div>
+          <span style="font-size:13px;color:var(--text-dim);">Tạo cuộc trò chuyện mới</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">Mở một thread chat trống mới.</p>
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Example</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-new', '/v1/threads/new')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-new">curl -X POST {BASE_URL}/v1/threads/new</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. ENDPOINT: /v1/history -->
+    <section id="ep-history" class="section-wrap">
+      <div class="endpoint-card">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag get" style="font-size:13px;padding:4px 10px;">GET</span>
+            <span class="endpoint-url">/v1/history</span>
+          </div>
+          <span style="font-size:13px;color:var(--text-dim);">Lấy lịch sử tin nhắn & Media</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">
+            Trả về danh sách tất cả các lượt hỏi - đáp của thread hiện tại hoặc thread được chỉ định qua query param <code style="color:#93c5fd;">?thread_id=thread_1</code>.
+          </p>
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Example</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-hist', '/v1/history')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-hist">curl "{BASE_URL}/v1/history?thread_id=thread_1"</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6.1. ENDPOINT: /v1/upload (File Staging) -->
+    <section id="ep-upload" class="section-wrap">
+      <div class="endpoint-card">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag post" style="font-size:13px;padding:4px 10px;">POST</span>
+            <span class="endpoint-url">/v1/upload</span>
+          </div>
+          <span style="font-size:13px;color:var(--text-dim);">Upload & Chuẩn bị File Trước (Staging)</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">
+            Cho phép tải file ảnh/video lên server lưu tạm vào <code>scratch/uploads</code> và đính kèm sẵn vào ô nhập (composer) của trang Agent 3T Global mà chưa gửi prompt ngay. 
+            Hỗ trợ cả <code>multipart/form-data</code> và JSON mảng <code>files</code> chứa Base64.
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Example — Upload File Multipart</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-upload', '/v1/upload')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-upload">curl -X POST {BASE_URL}/v1/upload \
+  -F "files=@/path/to/house_facade.jpg"</pre>
+          </div>
+
+          <p style="font-size:13.5px;color:var(--text-muted);margin:12px 0 6px 0;">Phản hồi từ server:</p>
+          <pre class="code-content" style="background:#080a10;border:1px solid var(--border);border-radius:8px;">{
+  "ok": true,
+  "files": ["b7f2a1_house_facade.jpg"],
+  "staged": 1
+}</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6.2. ENDPOINT: /v1/status (Capabilities & Health Check) -->
+    <section id="ep-status" class="section-wrap">
+      <div class="endpoint-card">
+        <div class="endpoint-header">
+          <div class="endpoint-badge-row">
+            <span class="method-tag get" style="font-size:13px;padding:4px 10px;">GET</span>
+            <span class="endpoint-url">/v1/status</span>
+          </div>
+          <span style="font-size:13px;color:#10b981;font-weight:600;">🟢 Trạng Thái & Khả Năng Máy Chủ (Capabilities)</span>
+        </div>
+
+        <div class="endpoint-body">
+          <p class="section-desc">
+            Kiểm tra trạng thái sẵn sàng của trình duyệt Playwright, kết nối với phiên Agent 3T Global đang active và các cờ tính năng mở rộng. 
+            Cờ <code>"batch_files": true</code> giúp các hệ thống tự động (Flowboard, Marketing Bot <code>fdv_mkt</code>) nhận diện máy chủ đã sẵn sàng tiếp nhận batch video song song có ảnh nhà/sản phẩm đính kèm.
+          </p>
+
+          <div class="code-container">
+            <div class="code-header">
+              <span>cURL Example</span>
+              <button class="btn-copy" onclick="copyDynamicSnippet('snippet-curl-status', '/v1/status')">Sao chép</button>
+            </div>
+            <pre class="code-content" id="snippet-curl-status">curl {BASE_URL}/v1/status</pre>
+          </div>
+
+          <p style="font-size:13.5px;color:var(--text-muted);margin:12px 0 6px 0;">Phản hồi mẫu thực tế:</p>
+          <pre class="code-content" style="background:#080a10;border:1px solid var(--border);border-radius:8px;">{
+  "ok": true,
+  "url": "https://muse.ai/",
+  "title": "Chat — Agent 3T Global",
+  "bridge_ready": true,
+  "headless": true,
+  "batch_files": true
+}</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. CODE INTEGRATIONS: COLAB BATCH PIPELINE -->
+    <section id="snippet-colab" class="section-wrap">
+      <h2 class="section-title">
+        <span>Google Colab Integration Pipeline (Batch 3 Video Song Song)</span>
+      </h2>
+      <p class="section-desc">Kịch bản Python hoàn chỉnh chạy trên Google Colab để gửi mảng prompt tới máy Mac qua Tailscale, sinh cùng lúc 3 video TVC, tải về và hiển thị phát trực tiếp trên notebook:</p>
+
+      <div class="code-container">
+        <div class="code-header">
+          <span>Python (Google Colab Notebook — Chạy 3 Video Đồng Thời)</span>
+          <button class="btn-copy" onclick="copySnippet('snippet-colab-code')">Sao chép</button>
+        </div>
+        <pre class="code-content" id="snippet-colab-code">import requests
+import json
+import time
+from IPython.display import Video, display
+
+# 1. Địa chỉ Tailscale của máy Mac đang chạy Agent 3T Global
+MUSE_API_URL = "http://100.95.215.84:8765"
+
+# 2. Danh sách các câu lệnh tạo Video TVC đồng thời
+prompts = [
+    "Tạo video TVC 5s ly cà phê sữa đá nhỏ giọt buổi sáng",
+    "Tạo video TVC 5s chiếc đồng hồ đeo tay cơ học sang trọng chuyển động",
+    "Tạo video TVC 5s sóng biển vỗ vào bãi cát trắng hoàng hôn"
+]
+
+print("🚀 Đang gửi batch tạo 3 video song song tới Agent 3T Global...")
+start_time = time.time()
+
+# 3. Gửi request batch với concurrency = 3
+resp = requests.post(
+    f"{MUSE_API_URL}/v1/batch/chat",
+    json={"prompts": prompts, "concurrency": 3, "timeout_ms": 300000},
+    timeout=360
+)
+data = resp.json()
+elapsed = time.time() - start_time
+print(f"✅ Hoàn tất toàn bộ {data.get('completed')}/{data.get('total')} video chỉ sau {elapsed:.2f} giây!\n")
+
+# 4. Tải video MP4 về Colab và phát trực tiếp trên Notebook cell:
+for idx, item in enumerate(data.get("results", []), 1):
+    prompt_txt = item.get("prompt")
+    duration = item.get("duration_ms", 0) / 1000
+    print(f"🎬 [Video #{idx}] {prompt_txt} (Render: {duration:.1f}s)")
+    for media_path in item.get("media", []):
+        video_url = f"{MUSE_API_URL}{media_path}"
+        local_name = f"colab_video_{idx}.mp4"
+        with open(local_name, "wb") as f:
+            f.write(requests.get(video_url).content)
+        print(f"   -> Đã tải về: {local_name}")
+        display(Video(local_name, embed=True, width=360))
+    print("-" * 50)</pre>
+      </div>
+
+      <div class="code-container" style="margin-top:20px;">
+        <div class="code-header">
+          <span>Python (Google Colab — Pipeline Video Bất Động Sản / Affiliate kèm Ảnh Base64)</span>
+          <button class="btn-copy" onclick="copySnippet('snippet-colab-realestate')">Sao chép</button>
+        </div>
+        <pre class="code-content" id="snippet-colab-realestate">import requests
+import json
+import base64
+import time
+from IPython.display import Video, display
+
+MUSE_API_URL = "http://100.95.215.84:8765"
+
+def image_to_base64_data_url(file_path):
+    with open(file_path, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("utf-8")
+        return f"data:image/jpeg;base64,{encoded}"
+
+# Chuẩn bị danh sách các căn nhà cùng ảnh tương ứng
+batch_items = [
+    {
+        "prompt": "Tạo video TVC 5s góc máy flycam lướt vào phòng khách căn biệt thự này, ánh sáng ấm cúng",
+        "files": [image_to_base64_data_url("biet_thu_quan2.jpg")]
+    },
+    {
+        "prompt": "Tạo video TVC 5s lia máy từ ban công nhìn ra hồ bơi căn penhouse này lúc hoàng hôn",
+        "files": [image_to_base64_data_url("penhouse_thao_dien.jpg")]
+    }
+]
+
+print("🚀 Đang gửi batch video Bất động sản kèm ảnh căn nhà...")
+start_time = time.time()
+
+resp = requests.post(
+    f"{MUSE_API_URL}/v1/batch/chat",
+    json={"items": batch_items, "concurrency": 2, "timeout_ms": 300000},
+    headers={"Content-Type": "application/json"},
+    timeout=360
+)
+data = resp.json()
+print(f"✅ Hoàn tất render video bám ảnh nhà sau {time.time() - start_time:.2f}s!")
+
+for idx, item in enumerate(data.get("results", []), 1):
+    print(f"🎬 Video #{idx}: {item.get('prompt')}")
+    for media_url in item.get("media", []):
+        video_full_url = f"{MUSE_API_URL}{media_url}"
+        print(f"   -> Link tải: {video_full_url}")
+        display(Video(video_full_url, embed=True, width=360))</pre>
+      </div>
+    </section>
+
+    <!-- 8. LIVE API TESTER -->
+    <section id="tester" class="section-wrap">
+      <h2 class="section-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        <span>Live API Tester (Thử nghiệm trực tiếp trên Browser)</span>
+      </h2>
+      <p class="section-desc">Gửi lệnh API trực tiếp từ giao diện tài liệu tới Server đang chạy và xem phản hồi hoặc phát video ngay lập tức:</p>
+
+      <div class="tester-box">
+        <div class="tester-tabs">
+          <button class="tester-tab-btn active" id="tab-btn-batch" onclick="switchTesterTab('batch')">
+            🚀 Batch Video Song Song (/v1/batch/chat)
+          </button>
+          <button class="tester-tab-btn" id="tab-btn-single" onclick="switchTesterTab('single')">
+            💬 Chat Đơn Lẻ (/v1/chat)
+          </button>
+        </div>
+
+        <!-- BATCH FORM -->
+        <div id="tester-panel-batch">
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">
+            Nhập danh sách prompt cần tạo video (mỗi dòng một câu lệnh prompt):
+          </div>
+          <textarea id="live-batch-prompts" class="tester-input" rows="4" style="resize:vertical;font-family:inherit;">Tạo video TVC 5s ly cà phê sữa đá nhỏ giọt buổi sáng
+Tạo video TVC 5s chiếc đồng hồ đeo tay cơ học sang trọng chuyển động
+Tạo video TVC 5s sóng biển vỗ vào bãi cát trắng hoàng hôn</textarea>
+          
+          <div style="display:flex;gap:16px;margin:12px 0;align-items:center;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;color:var(--text-muted);">Số luồng chạy song song (concurrency):</span>
+              <select id="live-batch-concurrency" class="tester-input" style="padding:6px 12px;width:80px;">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;color:var(--text-muted);">Timeout (ms):</span>
+              <input type="number" id="live-batch-timeout" class="tester-input" value="300000" style="padding:6px 12px;width:110px;" />
+            </div>
+          </div>
+
+          <div class="tester-btn-row">
+            <button class="btn-test" id="btn-run-live-batch" onclick="runLiveBatchTest()">
+              <span>🚀 Chạy Batch Video Song Song</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SINGLE CHAT FORM -->
+        <div id="tester-panel-single" style="display:none;">
+          <div style="font-weight:600;font-size:14px;color:#fff;margin-bottom:8px;">Thử nghiệm Endpoint: POST /v1/chat</div>
+          <div class="tester-inputs">
+            <input type="text" id="live-test-prompt" class="tester-input" value="Hãy trả lời ngắn gọn một câu: Bạn tên là gì?" placeholder="Nhập câu lệnh prompt..." />
+          </div>
+          <div class="tester-btn-row">
+            <button class="btn-test" id="btn-run-live-test" onclick="runLiveTest()">
+              <span>⚡ Gửi Request Chat</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- RESULTS -->
+        <div id="tester-result">
+          <div class="code-container">
+            <div class="code-header">
+              <span id="tester-status-badge">Phản hồi từ server:</span>
+            </div>
+            <pre class="code-content" id="tester-response-body">Đang xử lý...</pre>
+          </div>
+          <div id="tester-video-gallery" class="batch-cards-output" style="display:none;"></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    let currentBaseUrl = 'http://localhost:8765';
+
+    function setBaseUrl(url) {
+      currentBaseUrl = url;
+      document.querySelectorAll('.url-switch-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('onclick').includes(url));
+      });
+      updateAllSnippets();
+    }
+
+    function updateAllSnippets() {
+      document.querySelectorAll('pre').forEach(el => {
+        if (el.dataset.raw) {
+          el.innerText = el.dataset.raw.replace(/\{BASE_URL\}/g, currentBaseUrl);
+        } else if (el.innerText.includes('http://') || el.innerText.includes('{BASE_URL}')) {
+          el.dataset.raw = el.innerText.replace(/http:\/\/(localhost|100\.95\.215\.84|macbook-pro-2):8765/g, '{BASE_URL}');
+          el.innerText = el.dataset.raw.replace(/\{BASE_URL\}/g, currentBaseUrl);
+        }
+      });
+    }
+
+    function copyText(txt, btn) {
+      navigator.clipboard.writeText(txt);
+      const old = btn.innerText;
+      btn.innerText = 'Đã sao chép!';
+      setTimeout(() => btn.innerText = old, 1500);
+    }
+
+    function copySnippet(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        navigator.clipboard.writeText(el.innerText);
+        const btn = el.parentElement.querySelector('.btn-copy');
+        if (btn) {
+          const old = btn.innerText;
+          btn.innerText = 'Đã sao chép!';
+          setTimeout(() => btn.innerText = old, 1500);
+        }
+      }
+    }
+
+    function copyDynamicSnippet(id, path) {
+      const full = document.getElementById(id).innerText;
+      navigator.clipboard.writeText(full);
+      const btn = document.getElementById(id).parentElement.querySelector('.btn-copy');
+      if (btn) {
+        const old = btn.innerText;
+        btn.innerText = 'Đã sao chép!';
+        setTimeout(() => btn.innerText = old, 1500);
+      }
+    }
+
+    function switchTesterTab(tab) {
+      const isBatch = tab === 'batch';
+      document.getElementById('tab-btn-batch').classList.toggle('active', isBatch);
+      document.getElementById('tab-btn-single').classList.toggle('active', !isBatch);
+      document.getElementById('tester-panel-batch').style.display = isBatch ? 'block' : 'none';
+      document.getElementById('tester-panel-single').style.display = !isBatch ? 'block' : 'none';
+    }
+
+    async function runLiveTest() {
+      const prompt = document.getElementById('live-test-prompt').value.trim();
+      const btn = document.getElementById('btn-run-live-test');
+      const resBox = document.getElementById('tester-result');
+      const bodyEl = document.getElementById('tester-response-body');
+      const badge = document.getElementById('tester-status-badge');
+      const videoGallery = document.getElementById('tester-video-gallery');
+
+      if (!prompt) return;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Đang xử lý...</span>';
+      resBox.style.display = 'block';
+      videoGallery.style.display = 'none';
+      videoGallery.innerHTML = '';
+      bodyEl.innerText = 'Đang gửi prompt tới ' + currentBaseUrl + '/v1/chat ...';
+
+      const startTime = Date.now();
+      try {
+        const resp = await fetch(currentBaseUrl + '/v1/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, timeout_ms: 60000 })
+        });
+        const data = await resp.json();
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        badge.innerText = `Status: ${resp.status} ${resp.statusText} (${duration}s)`;
+        bodyEl.innerText = JSON.stringify(data, null, 2);
+        if (data.media && data.media.length > 0) {
+          videoGallery.innerHTML = '';
+          data.media.forEach((mPath, idx) => {
+            const mediaUrl = currentBaseUrl + mPath;
+            const isImg = /\.(webp|png|jpg|jpeg|gif)$/i.test(mPath);
+            const card = document.createElement('div');
+            card.className = 'video-card';
+            card.innerHTML = `
+              ${isImg ? `<a href="${mediaUrl}" target="_blank"><img class="image-preview" src="${mediaUrl}" alt="Media"/></a>` : `<video class="video-player" controls preload="metadata" src="${mediaUrl}"></video>`}
+              <div class="video-card-body">
+                <div class="video-card-title">${isImg ? '🎨 Ảnh sinh ra' : '🎬 Video TVC'}</div>
+                <a href="${mediaUrl}" target="_blank" download class="btn-video-dl">⬇️ Tải file ${isImg ? 'Ảnh' : 'MP4'}</a>
+              </div>
+            `;
+            videoGallery.appendChild(card);
+          });
+          videoGallery.style.display = 'grid';
+        }
+      } catch (err) {
+        badge.innerText = 'Lỗi kết nối';
+        bodyEl.innerText = err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ Gửi Request Chat</span>';
+      }
+    }
+
+    async function runLiveBatchTest() {
+      const rawText = document.getElementById('live-batch-prompts').value.trim();
+      const prompts = rawText.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+      const concurrency = parseInt(document.getElementById('live-batch-concurrency').value) || 2;
+      const timeout_ms = parseInt(document.getElementById('live-batch-timeout').value) || 300000;
+
+      const btn = document.getElementById('btn-run-live-batch');
+      const resBox = document.getElementById('tester-result');
+      const bodyEl = document.getElementById('tester-response-body');
+      const badge = document.getElementById('tester-status-badge');
+      const videoGallery = document.getElementById('tester-video-gallery');
+
+      if (prompts.length === 0) {
+        alert('Vui lòng nhập ít nhất 1 câu lệnh prompt!');
+        return;
+      }
+
+      btn.disabled = true;
+      resBox.style.display = 'block';
+      videoGallery.style.display = 'none';
+      videoGallery.innerHTML = '';
+
+      const startTime = Date.now();
+      let timerInterval = setInterval(() => {
+        const sec = ((Date.now() - startTime) / 1000).toFixed(1);
+        btn.innerHTML = `<span>⏳ Đang sinh ${prompts.length} media song song (${sec}s)...</span>`;
+        bodyEl.innerText = `Đang xử lý ${prompts.length} media với ${concurrency} workers song song...\nThời gian: ${sec}s`;
+      }, 500);
+
+      try {
+        const resp = await fetch(currentBaseUrl + '/v1/batch/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompts, concurrency, timeout_ms })
+        });
+        clearInterval(timerInterval);
+        const data = await resp.json();
+        const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+        badge.innerText = `Hoàn tất Batch: ${data.completed || 0}/${data.total || prompts.length} media (${duration}s)`;
+        bodyEl.innerText = JSON.stringify(data, null, 2);
+
+        // Render generated media (both videos and images)
+        if (data.results && data.results.length > 0) {
+          videoGallery.innerHTML = '';
+          data.results.forEach((item, idx) => {
+            const hasMedia = item.media && item.media.length > 0;
+            const mediaUrl = hasMedia ? (currentBaseUrl + item.media[0]) : '';
+            const isImg = hasMedia && /\.(webp|png|jpg|jpeg|gif)$/i.test(item.media[0]);
+            const card = document.createElement('div');
+            card.className = 'video-card';
+            card.innerHTML = `
+              ${hasMedia ? (isImg ? `<a href="${mediaUrl}" target="_blank"><img class="image-preview" src="${mediaUrl}" alt="Media"/></a>` : `<video class="video-player" controls preload="metadata" src="${mediaUrl}"></video>`) : '<div style="height:120px;display:flex;align-items:center;justify-content:center;color:#ef4444;">Không có media</div>'}
+              <div class="video-card-body">
+                <div class="video-card-title">${isImg ? '🎨 Ảnh' : '🎬 Video'} #${idx + 1} (${((item.duration_ms || 0)/1000).toFixed(1)}s)</div>
+                <div class="video-prompt-text">"${item.prompt || ''}"</div>
+                ${hasMedia ? `<a href="${mediaUrl}" target="_blank" download class="btn-video-dl">⬇️ Tải file ${isImg ? 'Ảnh' : 'MP4'}</a>` : ''}
+              </div>
+            `;
+            videoGallery.appendChild(card);
+          });
+          videoGallery.style.display = 'grid';
+        }
+      } catch (err) {
+        clearInterval(timerInterval);
+        badge.innerText = 'Lỗi kết nối';
+        bodyEl.innerText = err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀 Chạy Batch Video Song Song</span>';
+      }
+    }
+
+    // Init
+    updateAllSnippets();
+  </script>
+</body>
+</html>
