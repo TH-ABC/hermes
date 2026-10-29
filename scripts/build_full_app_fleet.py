@@ -39,12 +39,32 @@ def push_to_build_github():
         from pathlib import Path
         v_dir = Path("D:/hermes-main/hermes-agent-vercel")
         if (v_dir / ".git").exists():
-            subprocess.run(["git", "config", "user.name", "3tmerfast-ui"], cwd=v_dir, check=True)
-            subprocess.run(["git", "config", "user.email", "3t.merfast@gmail.com"], cwd=v_dir, check=True)
+            subprocess.run(["git", "config", "user.name", "5merchdtv-6848"], cwd=v_dir, check=True)
+            subprocess.run(["git", "config", "user.email", "5merchdtv@gmail.com"], cwd=v_dir, check=True)
             subprocess.run(["git", "add", "."], cwd=v_dir, check=True)
-            res = subprocess.run(["git", "commit", "-m", "Auto-sync from Backend Server", "--author=3tmerfast-ui <3t.merfast@gmail.com>"], cwd=v_dir, capture_output=True, text=True)
+            res = subprocess.run(["git", "commit", "-m", "Auto-sync from Backend Server", "--author=5merchdtv-6848 <5merchdtv@gmail.com>"], cwd=v_dir, capture_output=True, text=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=v_dir, capture_output=True, text=True)
             print("🚀 Đã tự động push code sang GitHub Hermes-build (Vercel CI/CD)!")
+            v_token = os.environ.get("VERCEL_TOKEN")
+            if not v_token:
+                try:
+                    auth_file = Path.home() / "AppData/Roaming/com.vercel.cli/Data/auth.json"
+                    if auth_file.exists():
+                        with open(auth_file, "r", encoding="utf-8") as af:
+                            v_token = json.load(af).get("token")
+                except Exception:
+                    pass
+            deploy_cmd = ["npx.cmd", "vercel", "deploy", "--prod", "--yes"]
+            if v_token:
+                deploy_cmd.extend(["--token", v_token])
+            deploy_res = subprocess.run(
+                deploy_cmd,
+                cwd=v_dir,
+                capture_output=True,
+                text=True
+            )
+            if deploy_res.returncode == 0:
+                print("🌟 Vercel Production Deploy OK: https://hermes-agent-vercel.vercel.app")
     except Exception as e:
         print(f"⚠️ Git auto-push warning: {e}")
 
