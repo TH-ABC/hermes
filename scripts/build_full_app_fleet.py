@@ -336,7 +336,7 @@ def build_app():
           <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
             <div>
               <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng Nhóm Zalo</p>
-              <h3 class="text-2xl font-black text-slate-900 mt-1">{total_groups_count} Nhóm</h3>
+              <h3 id="kpi-total-groups-count" class="text-2xl font-black text-slate-900 mt-1">{total_groups_count} Nhóm</h3>
               <p class="text-[11px] text-[#0066cc] font-semibold mt-1">100% Đang kết nối Bot</p>
             </div>
             <div class="w-12 h-12 rounded-2xl bg-blue-50 text-[#0066cc] flex items-center justify-center">
@@ -382,7 +382,7 @@ def build_app():
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
           <div class="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
-              <h2 class="text-base font-extrabold text-slate-900">Danh Sách {total_groups_count} Nhóm Zalo Đang Phụ Trách</h2>
+              <h2 id="heading-total-groups" class="text-base font-extrabold text-slate-900">Danh Sách {total_groups_count} Nhóm Zalo Đang Phụ Trách</h2>
               <p class="text-xs text-slate-500 mt-0.5">Hiển thị chi tiết Group ID, số thành viên và chính sách Persona tương ứng của từng nhóm.</p>
             </div>
             <button onclick="switchTab('groups')" class="text-xs text-[#0066cc] font-bold hover:underline flex items-center space-x-1 cursor-pointer">
@@ -2399,7 +2399,7 @@ def build_app():
           if (grpKeys.length > 0) {{
             selectGroup(grpKeys[0]);
           }}
-          setTimeout(() => location.reload(), 1500);
+          await loadLiveGroups();
         }} else {{
           alert(`❌ Thoát nhóm thất bại: ${{res.error || res.message || 'Lỗi không xác định từ Sever'}}`);
         }}
@@ -2795,6 +2795,63 @@ def build_app():
       }} catch (e) {{}}
     }}
 
+    async function loadLiveGroups() {{
+      try {{
+        const resp = await fetch('/api/groups', {{ cache: 'no-store' }});
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data && data.groups) {{
+          const newGroups = {{}};
+          for (const [gid, ginfo] of Object.entries(data.groups)) {{
+            const mList = Object.entries(ginfo.members || {{}}).map(([uid, m]) => ({{
+              name: m.name || uid,
+              uid: uid,
+              avatar: m.avatar || '',
+              role: m.role || 'Thành Viên',
+              phone: m.phone || '',
+              canDM: m.can_dm ?? true,
+              canGroup: m.can_group ?? true,
+              canAssign: m.can_assign ?? false,
+              canMedia: m.can_media ?? false,
+              storagePath: `D:/hermes-main/storage/users/u_${{uid.replace('u:', '')}}/`,
+              files: (uid.replace('u:', '') === '7725451581835120119') 
+                ? ["Chien_luoc_Q4.xlsx", "Quy_chuan_Hermes.md", "Policy_real.json"] 
+                : ["context_zalo.json", "chat_history.log"]
+            }}));
+
+            newGroups[gid] = {{
+              id: gid,
+              name: ginfo.name || gid,
+              avatar: ginfo.avatar || '👥',
+              memberCount: `${{mList.length}} người`,
+              persona: ginfo.persona_name || ginfo.persona || 'Tiêu Chuẩn',
+              members: mList
+            }};
+          }}
+          SYSTEM_DATABASE.groups = newGroups;
+          renderOverviewCards();
+
+          const kpiEl = document.getElementById('kpi-total-groups-count');
+          if (kpiEl) kpiEl.innerText = `${{Object.keys(newGroups).length}} Nhóm`;
+          const headingEl = document.getElementById('heading-total-groups');
+          if (headingEl) headingEl.innerText = `Danh Sách ${{Object.keys(newGroups).length}} Nhóm Zalo Đang Phụ Trách`;
+
+          const picker = document.getElementById('group-picker-select');
+          if (picker) {{
+            const currentVal = picker.value;
+            picker.innerHTML = Object.keys(newGroups).map(k => `<option value="${{k}}">${{newGroups[k].name}} (${{k}})</option>`).join('');
+            if (newGroups[currentVal]) {{
+              picker.value = currentVal;
+            }} else if (Object.keys(newGroups).length > 0) {{
+              selectGroup(Object.keys(newGroups)[0]);
+            }}
+          }}
+        }}
+      }} catch (err) {{
+        console.warn('loadLiveGroups error:', err);
+      }}
+    }}
+
     // Init
     window.addEventListener('DOMContentLoaded', () => {{
       loadFleetFromStorage();
@@ -2807,6 +2864,8 @@ def build_app():
       lucide.createIcons();
       loadLivePoolAccounts();
       setInterval(loadLivePoolAccounts, 30000);
+      loadLiveGroups();
+      setInterval(loadLiveGroups, 30000);
     }});
   </script>
 </body>
