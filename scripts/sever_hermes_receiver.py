@@ -457,6 +457,50 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
         self._send_json({"error": "Endpoint not found"}, 404)
 
     def do_POST(self):
+        if self.path.startswith("/api/groups/leave"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_length)
+            try:
+                payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+                gid = str(payload.get("group_id") or payload.get("id") or "").strip()
+                if not gid:
+                    self._send_json({"ok": False, "error": "group_id is required"}, 400)
+                    return
+
+                # 1. Gọi lệnh /leave-group sang Zalo Bridge (Cổng 3050)
+                bridge_res = {}
+                try:
+                    import urllib.request
+                    b_req = urllib.request.Request(
+                        "http://127.0.0.1:3050/leave-group",
+                        data=json.dumps({"group_id": gid, "silent": True}).encode("utf-8"),
+                        headers={"Content-Type": "application/json"}
+                    )
+                    with urllib.request.urlopen(b_req, timeout=10) as b_resp:
+                        bridge_res = json.loads(b_resp.read().decode("utf-8"))
+                except Exception as be:
+                    bridge_res = {"error": str(be)}
+
+                # 2. Xóa khỏi policy.json
+                p_file = Path("D:/hermes-main/storage/policy.json")
+                if p_file.exists():
+                    p_data = json.loads(p_file.read_text(encoding="utf-8"))
+                    clean_gid = f"g:{gid}" if not gid.startswith("g:") else gid
+                    raw_num = gid.replace("g:", "")
+                    p_data.get("groups", {}).pop(clean_gid, None)
+                    p_data.get("groups", {}).pop(raw_num, None)
+                    p_data["total_groups"] = len(p_data.get("groups", {}))
+                    p_file.write_text(json.dumps(p_data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+                self._send_json({
+                    "ok": True,
+                    "message": f"Đã cho Bot rời khỏi nhóm {gid} thành công!",
+                    "bridge": bridge_res
+                })
+                return
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+                return
         if self.path.startswith("/api/tenants/bot/add"):
             content_length = int(self.headers.get("Content-Length", 0))
             raw_body = self.rfile.read(content_length)

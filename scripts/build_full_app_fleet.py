@@ -727,6 +727,10 @@ def build_app():
           </div>
 
           <div class="flex items-center space-x-3">
+            <button onclick="leaveZaloGroup(CURRENT_GROUP_KEY, document.getElementById('group-name-display').innerText)" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 hover:border-rose-300 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition-all shadow-sm">
+              <span>🚪</span>
+              <span>Thoát Nhóm Này</span>
+            </button>
             <select id="group-picker-select" onchange="selectGroup(this.value)" class="bg-slate-50 border border-slate-300 text-slate-900 text-xs rounded-xl focus:ring-[#0066cc] focus:border-[#0066cc] p-2.5 font-bold cursor-pointer">
 {options_html}            </select>
           </div>
@@ -2374,6 +2378,36 @@ def build_app():
       alert("✅ Đã xuất và tải về file Excel báo cáo hệ thống thành công!");
     }}
 
+    async function leaveZaloGroup(gid, gname) {{
+      if (!gid) return;
+      const cleanGname = gname || gid;
+      const confirmed = confirm(`⚠️ Sếp có chắc chắn muốn BOT rời khỏi nhóm:\n"${{cleanGname}}"\n(ID: ${{gid}}) không?\n\nSau khi thoát, bot sẽ không nhận tin và không phản hồi trong nhóm này nữa!`);
+      if (!confirmed) return;
+
+      try {{
+        const resp = await fetch('/api/groups/leave', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ group_id: gid }})
+        }});
+        const res = await resp.json();
+        if (resp.ok && (res.status === 'success' || res.ok)) {{
+          alert(`✅ Đã điều khiển BOT thoát khỏi nhóm "${{cleanGname}}" thành công!`);
+          delete SYSTEM_DATABASE.groups[gid];
+          renderOverviewCards();
+          const grpKeys = Object.keys(SYSTEM_DATABASE.groups);
+          if (grpKeys.length > 0) {{
+            selectGroup(grpKeys[0]);
+          }}
+          setTimeout(() => location.reload(), 1500);
+        }} else {{
+          alert(`❌ Thoát nhóm thất bại: ${{res.error || res.message || 'Lỗi không xác định từ Sever'}}`);
+        }}
+      }} catch (err) {{
+        alert(`❌ Lỗi kết nối khi gửi lệnh thoát nhóm: ${{err.message}}`);
+      }}
+    }}
+
     function renderOverviewCards() {{
       const container = document.getElementById('overview-group-cards');
       if (!container) return;
@@ -2385,10 +2419,16 @@ def build_app():
           : `<span class="w-8 h-8 rounded-lg bg-blue-100 text-[#0066cc] flex items-center justify-center font-bold text-xs">${{g.avatar || '👥'}}</span>`;
 
         return `
-          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:border-[#0066cc] hover:shadow-md transition-all cursor-pointer" onclick="selectGroup('${{g.id}}'); switchTab('groups')">
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:border-[#0066cc] hover:shadow-md transition-all cursor-pointer relative group/card" onclick="selectGroup('${{g.id}}'); switchTab('groups')">
             <div class="flex items-center justify-between mb-2">
               ${{avtHtml}}
-              <span class="text-[9px] font-mono text-slate-400 truncate max-w-[120px]">${{g.id}}</span>
+              <div class="flex items-center space-x-1.5">
+                <span class="text-[9px] font-mono text-slate-400 truncate max-w-[90px]">${{g.id}}</span>
+                <button onclick="event.stopPropagation(); leaveZaloGroup('${{g.id}}', '${{g.name.replace(/'/g, \"\\'\")}}')" title="Thoát nhóm này" class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-600 hover:text-white transition-all shadow-sm flex items-center space-x-0.5">
+                  <span>🚪</span>
+                  <span>Thoát</span>
+                </button>
+              </div>
             </div>
             <h4 class="font-bold text-xs text-slate-900 truncate">${{g.name}}</h4>
             <p class="text-[11px] text-slate-500 mt-1">${{g.memberCount}} • ${{g.persona}}</p>

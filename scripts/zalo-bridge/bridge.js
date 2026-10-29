@@ -587,6 +587,30 @@ app.post('/invite-to-group', async (req, res) => {
   }
 });
 
+app.post('/leave-group', async (req, res) => {
+  if (!api || connectionState !== 'connected') {
+    return res.status(503).json({ error: 'Not connected to Zalo' });
+  }
+  const { group_id: groupId, silent } = req.body || {};
+  if (!groupId) {
+    return res.status(400).json({ error: 'group_id is required' });
+  }
+  let parsed;
+  try {
+    parsed = parseChatId(groupId);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  try {
+    console.log(`[Bridge] Leaving group ${parsed.threadId} (silent=${!!silent})...`);
+    const result = await enqueueSend(() => withTimeout(api.leaveGroup(parsed.threadId, !!silent)));
+    res.json({ success: true, result });
+  } catch (err) {
+    console.error(`[Bridge] Error leaving group ${groupId}:`, err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 function startServer() {
   app.listen(PORT, '127.0.0.1', () => {
     console.log(`Zalo bridge listening on 127.0.0.1:${PORT}`);
