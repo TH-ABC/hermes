@@ -204,14 +204,8 @@ def sync_zalo_groups() -> bool:
     return False
 
 def rebuild_dashboard_if_needed():
-    """Tự động gọi script build_full_app_fleet.py để đồng bộ app.html."""
-    try:
-        sys.path.insert(0, str(SCRIPTS_DIR))
-        import build_full_app_fleet
-        build_full_app_fleet.build_app()
-        log_daemon("🚀 Đã tự động tái tạo app.html với dữ liệu nhóm & pool mới nhất!")
-    except Exception as e:
-        log_daemon(f"⚠️ Lỗi rebuild app.html: {e}")
+    """Cập nhật dữ liệu động vào Backend SQLite & policy.json (REST API phục vụ trực tiếp cho Web, không cần commit git đè HTML)."""
+    log_daemon("🚀 Dữ liệu nhóm & pool mới đã được cập nhật vào policy.json & phục vụ động qua REST API /api/groups!")
 
 def run_loop():
     log_daemon("=====================================================")

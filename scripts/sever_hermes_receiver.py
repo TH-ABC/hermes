@@ -333,10 +333,23 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
 
         if self.path.startswith("/api/groups"):
             try:
+                p_file = Path("D:/hermes-main/storage/policy.json")
+                if not p_file.exists():
+                    p_file = ROOT_DIR / "storage" / "policy.json"
+                if p_file.exists():
+                    with open(p_file, "r", encoding="utf-8") as f:
+                        policy_data = json.load(f)
+                    self._send_json({
+                        "ok": True,
+                        "source": "sever_policy_db",
+                        "total_groups": len(policy_data.get("groups", {})),
+                        "groups": policy_data.get("groups", {})
+                    })
+                    return
                 import urllib.request
                 with urllib.request.urlopen("http://127.0.0.1:3050/groups", timeout=10) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
-                    self._send_json(data)
+                    self._send_json({"ok": True, "source": "zalo_bridge", "groups": data})
                     return
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
