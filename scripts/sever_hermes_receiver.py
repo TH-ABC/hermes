@@ -389,6 +389,22 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "error": str(e)}, 500)
                 return
 
+        if self.path.startswith("/api/assistants"):
+            try:
+                p_file = Path("D:/hermes-main/storage/assistants.json")
+                if not p_file.exists():
+                    p_file = ROOT_DIR / "storage" / "assistants.json"
+                if p_file.exists():
+                    with open(p_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    self._send_json({"ok": True, "data": data, "assistants": data.get("assistants", [])})
+                    return
+                self._send_json({"ok": False, "error": "assistants.json not found"}, 404)
+                return
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+                return
+
         if self.path.startswith("/api/groups"):
             try:
                 p_file = Path("D:/hermes-main/storage/policy.json")
@@ -502,6 +518,35 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
                 return
+        if self.path.startswith("/api/assistants/assign-cookie"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_length)
+            try:
+                body = json.loads(raw_body.decode("utf-8"))
+                bot_id = body.get("bot_id")
+                assigned_cookies = body.get("assigned_cookies", [])
+                p_file = Path("D:/hermes-main/storage/assistants.json")
+                if not p_file.exists():
+                    p_file = ROOT_DIR / "storage" / "assistants.json"
+                with open(p_file, "r", encoding="utf-8") as f:
+                    fdata = json.load(f)
+                updated = False
+                for b in fdata.get("assistants", []):
+                    if b.get("id") == bot_id:
+                        b["assigned_cookies"] = assigned_cookies
+                        updated = True
+                        break
+                if updated:
+                    with open(p_file, "w", encoding="utf-8") as f:
+                        json.dump(fdata, f, indent=2, ensure_ascii=False)
+                    self._send_json({"ok": True, "message": "Updated assigned cookies", "assigned_cookies": assigned_cookies})
+                    return
+                self._send_json({"ok": False, "error": f"Bot {bot_id} not found"}, 404)
+                return
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+                return
+
         if self.path.startswith("/api/tenants/bot/add"):
             content_length = int(self.headers.get("Content-Length", 0))
             raw_body = self.rfile.read(content_length)

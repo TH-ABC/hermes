@@ -399,308 +399,315 @@ def build_app():
         </div>
       </section>
 
-      <!-- ==================== TAB: QUẢN TRỊ ĐA TRỢ LÝ & COOKIE POOL ==================== -->
+            <!-- ==================== TAB: QUẢN TRỊ ĐA TRỢ LÝ & COOKIE POOL ==================== -->
       <section id="pane-assistants" class="tab-pane space-y-6">
-        <!-- Sub-Navigation Bar Between Zalo Bot Fleet, Virtual Bots, and Cookie Studio Pool -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
-          <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <button onclick="switchFleetSubTab('zalo')" id="btn-subtab-zalo" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-sm flex items-center space-x-1.5">
-              <i data-lucide="smartphone" class="w-4 h-4"></i>
-              <span>📱 Trợ Lý Zalo ({len(assistants_list)})</span>
-            </button>
-            <button onclick="switchFleetSubTab('virtual')" id="btn-subtab-virtual" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center space-x-1.5">
-              <i data-lucide="cpu" class="w-4 h-4 text-purple-600"></i>
-              <span>🤖 Đa Bot Ảo Theo Mã (1 Zalo)</span>
-              <span class="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-purple-100 text-purple-800" id="badge-virtual-count">{len(all_virtual_bots)} Bot</span>
-            </button>
-            <button onclick="switchFleetSubTab('pool')" id="btn-subtab-pool" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center space-x-1.5">
-              <i data-lucide="cookie" class="w-4 h-4 text-amber-500"></i>
-              <span>🍪 Pool AI & Cookie</span>
-              <span class="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-800" id="badge-pool-count">{len(pool_accounts_list)} Acc</span>
-            </button>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-            <button onclick="openAddVirtualBotModal()" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer">
-              <i data-lucide="plus-circle" class="w-4 h-4"></i>
-              <span>+ Thêm Bot Mới (Không Giới Hạn)</span>
-            </button>
-            <button onclick="openImportCookieModal()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer">
-              <i data-lucide="cookie" class="w-4 h-4"></i>
-              <span>+ Nạp Cookie</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- ==================== SUB-VIEW 1: ZALO FLEET ==================== -->
-        <div id="subview-zalo" class="space-y-6">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <!-- TẦNG 1: CHỌN ZALO BOT TRƯỚC (MASTER SELECTOR BAR) -->
+        <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-lg">
+                📱
+              </div>
               <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng Trợ Lý Zalo</p>
-                <h3 class="text-2xl font-black text-indigo-600 mt-1" id="fleet-total-count">{len(assistants_list)} Trợ Lý</h3>
-                <p class="text-[11px] text-slate-500 font-semibold mt-1">Đa cổng Bridge 3050, 3051...</p>
-              </div>
-              <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <i data-lucide="bot" class="w-6 h-6"></i>
-              </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-              <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Trợ Lý Online</p>
-                <h3 class="text-2xl font-black text-emerald-600 mt-1" id="fleet-online-count">3 Online</h3>
-                <p class="text-[11px] text-emerald-600 font-semibold mt-1">Phản hồi tin Zalo tức thì</p>
-              </div>
-              <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <i data-lucide="activity" class="w-6 h-6"></i>
-              </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-              <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Phân Bổ Nhóm</p>
-                <h3 class="text-2xl font-black text-slate-900 mt-1">{total_groups_count} Nhóm</h3>
-                <p class="text-[11px] text-slate-500 font-semibold mt-1">Phân quyền độc lập từng bot</p>
-              </div>
-              <div class="w-12 h-12 rounded-2xl bg-blue-50 text-[#0066cc] flex items-center justify-center">
-                <i data-lucide="users" class="w-6 h-6"></i>
-              </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-              <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng Tin Đã Điều Phối</p>
-                <h3 class="text-2xl font-black text-purple-600 mt-1" id="fleet-messages-count">3,140 Tin</h3>
-                <p class="text-[11px] text-purple-600 font-semibold mt-1">Hoàn toàn tự động</p>
-              </div>
-              <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                <i data-lucide="message-square" class="w-6 h-6"></i>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Danh Sách Trợ Lý Zalo Đang Vận Hành</h3>
-            <button onclick="openAddAssistantModal()" class="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-bold">
-              + Nạp Bot Zalo Mới
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="fleet-cards-container">
-            <!-- Dynamically populated by JS -->
-          </div>
-        </div>
-
-        <!-- ==================== SUB-VIEW 2: COOKIE STUDIO POOL (CỔNG 8770) ==================== -->
-        <div id="subview-pool" class="space-y-6 hidden">
-          <!-- Pool KPI Metrics -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-              <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng Tài Khoản Pool</p>
-                <h3 class="text-2xl font-black text-amber-600 mt-1" id="pool-kpi-total">{len(pool_accounts_list)} Tài Khoản</h3>
-                <p class="text-[11px] text-slate-500 font-semibold mt-1">Cổng Máy Chủ 8770</p>
-              </div>
-              <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                <i data-lucide="clapperboard" class="w-6 h-6"></i>
-              </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-              <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Cookie Sẵn Sàng (Ready)</p>
-                <h3 class="text-2xl font-black text-emerald-600 mt-1" id="pool-kpi-ready">2 Tài Khoản</h3>
-                <p class="text-[11px] text-emerald-600 font-semibold mt-1">Sẵn sàng render video/ảnh</p>
-              </div>
-              <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <i data-lucide="check-circle" class="w-6 h-6"></i>
-              </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-              <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Cookie Hết Hạn (Expired)</p>
-                <h3 class="text-2xl font-black text-rose-600 mt-1" id="pool-kpi-expired">1 Cần Nạp Lại</h3>
-                <p class="text-[11px] text-rose-600 font-semibold mt-1">Cần nạp lại Cookie mới</p>
-              </div>
-              <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-              </div>
-            </div>
-
-            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-              <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng Tác Phẩm Render</p>
-                <h3 class="text-2xl font-black text-indigo-600 mt-1" id="pool-kpi-renders">98 Video & Ảnh</h3>
-                <p class="text-[11px] text-slate-500 font-semibold mt-1">Chất lượng cao 4K / HD</p>
-              </div>
-              <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <i data-lucide="film" class="w-6 h-6"></i>
-              </div>
-            </div>
-          </div>
-
-          <!-- ==================== AUTO OTP & LOCAL CAPTCHA LOGIN PANEL ==================== -->
-          <div class="bg-white rounded-3xl border border-indigo-200/80 shadow-md shadow-indigo-100/50 p-6 space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-50 pb-4">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
-                  ⚡
-                </div>
-                <div>
-                  <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Tự Động Nạp Mail | Password & Đăng Nhập Local Giải Captcha</h3>
-                  <p class="text-xs text-slate-500 mt-0.5">Tự động lấy mã OTP Microsoft, hoặc mở Chrome thật trên màn hình Sever để Sếp tự giải captcha trực tiếp.</p>
-                </div>
-              </div>
-              <div class="flex items-center space-x-2">
-                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">Auto OTP & Local Solve</span>
-              </div>
-            </div>
-
-            <div class="space-y-3">
-              <div class="flex items-center justify-between text-xs font-bold text-slate-700">
-                <span>Danh Sách Tài Khoản (mỗi dòng 1 tài khoản: <code class="font-mono text-indigo-600 font-semibold">email|password</code> hoặc <code class="font-mono text-indigo-600 font-semibold">email|pass|refreshToken</code>)</span>
-                <span id="autoAccCount" class="text-slate-400 font-mono text-[11px]">0 tài khoản</span>
-              </div>
-              <textarea id="autoAccInput" rows="3" oninput="updateAutoAccCount()" placeholder="user1@hotmail.com|password123&#10;user2@hotmail.com|password456|refreshToken|client_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"></textarea>
-
-              <div class="flex flex-col sm:flex-row items-center gap-2">
-                <input type="text" id="sheetUrl" placeholder="Hoặc dán link Google Sheet (cột: email | password | refreshToken | client_id)" class="flex-1 w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none font-medium">
-                <button onclick="loadFromGoogleSheet()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
-                  <i data-lucide="sheet" class="w-4 h-4 text-emerald-600"></i>
-                  <span>Tải Từ Sheet</span>
-                </button>
-              </div>
-
-              <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <div class="flex flex-wrap items-center gap-4 text-xs">
-                  <label class="flex items-center space-x-2 cursor-pointer text-slate-600 font-semibold">
-                    <input type="checkbox" id="autoAccSkip" checked class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
-                    <span>Bỏ qua tài khoản đang hoạt động (chỉ chạy lại khi expired)</span>
-                  </label>
-                  <label class="flex items-center space-x-2 cursor-pointer text-slate-600 font-semibold">
-                    <input type="checkbox" id="autoAccOverwrite" checked class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
-                    <span>Ghi đè tài khoản đã có (để cập nhật lại cookie mới nếu hết hạn)</span>
-                  </label>
-                </div>
-
-                <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
-                  <button onclick="startAutoExtract()" id="btnStartAutoAcc" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-indigo-600/20 transition-all cursor-pointer">
-                    <i data-lucide="zap" class="w-4 h-4 text-amber-300"></i>
-                    <span>⚡ Bắt Đầu Đăng Nhập & Nạp Vào Pool</span>
-                  </button>
-                  <button onclick="startLocalLogin()" id="btnStartLocalAcc" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-purple-600/20 transition-all cursor-pointer" title="Mở Chrome trên máy Sever để tự giải captcha">
-                    <i data-lucide="monitor" class="w-4 h-4"></i>
-                    <span>🖥️ Đăng Nhập Local (Tự Giải Captcha)</span>
-                  </button>
-                  <button onclick="openImportCookieModal()" class="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer" title="Dán cookie JSON trực tiếp">
-                    <i data-lucide="cookie" class="w-4 h-4"></i>
-                    <span>+ Nạp Cookie</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Progress & Logs Box -->
-              <div id="autoAccProgress" class="hidden pt-3 border-t border-slate-100 space-y-2">
-                <div class="flex items-center justify-between text-xs">
-                  <span id="autoAccStatus" class="font-bold text-indigo-600">Đang chuẩn bị...</span>
-                  <span id="autoAccRatio" class="font-mono text-slate-400 font-bold">0/0</span>
-                </div>
-                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
-                  <div id="autoAccBar" class="bg-indigo-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-                <pre id="autoAccLogs" class="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-[11px] max-h-36 overflow-y-auto leading-relaxed border border-slate-800"></pre>
-              </div>
-            </div>
-          </div>
-
-          <!-- Pool Accounts Table -->
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="p-5 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Danh Sách Tài Khoản Trong Pool Cookie (Cổng 8770)</h3>
-                <p class="text-xs text-slate-500 mt-0.5">Tự động điều phối các yêu cầu tạo video/ảnh qua các tài khoản còn hiệu lực.</p>
-              </div>
-              <div class="flex items-center space-x-2">
-                <button onclick="checkPoolHealth()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1">
-                  <i data-lucide="activity" class="w-3.5 h-3.5 text-emerald-600"></i>
-                  <span>Kiểm Tra Sức Khỏe Pool</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs text-slate-600">
-                <thead class="bg-slate-50 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                  <tr>
-                    <th class="py-3 px-4">Tên Tài Khoản</th>
-                    <th class="py-3 px-4 text-center">Trạng Thái Cookie</th>
-                    <th class="py-3 px-4">⚡ Mức Sử Dụng & Token</th>
-                    <th class="py-3 px-4 text-center">⏱️ Chu Kỳ Đặt Lại (Tuần)</th>
-                    <th class="py-3 px-4 text-center">Khả Năng Đồ Họa</th>
-                    <th class="py-3 px-4 text-center">Tác Phẩm</th>
-                    <th class="py-3 px-4 text-right">Thao Tác</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 font-medium" id="pool-table-body">
-                  <!-- Dynamically populated -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- ==================== SUB-VIEW 3: VIRTUAL BOTS (1 ZALO ĐA BOT) ==================== -->
-        <div id="subview-virtual" class="space-y-6 hidden">
-          <!-- Overview Card -->
-          <div class="bg-gradient-to-r from-purple-900 to-indigo-900 p-6 rounded-3xl text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div class="space-y-1.5">
-              <div class="flex items-center space-x-2">
-                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-purple-500/30 text-purple-200 border border-purple-400/30">Kiến Trúc Đột Phá</span>
-                <span class="text-xs text-purple-200 font-mono">1 Tài Khoản Zalo → Nhiều Bot Độc Lập</span>
-              </div>
-              <h3 class="text-lg font-black tracking-tight">Điều Phối Đa Bot Ảo Theo Mã Riêng (Routing Dispatcher)</h3>
-              <p class="text-xs text-purple-200 max-w-2xl leading-relaxed">
-                Người dùng gửi tin kèm mã riêng (<code class="bg-black/30 px-1 py-0.5 rounded text-amber-300 font-mono">#MEDIA</code>, <code class="bg-black/30 px-1 py-0.5 rounded text-amber-300 font-mono">#HERMES</code>, <code class="bg-black/30 px-1 py-0.5 rounded text-amber-300 font-mono">#KETOAN</code>, <code class="bg-black/30 px-1 py-0.5 rounded text-amber-300 font-mono">#SALE</code>). Hệ thống tự động bóc tách mã, kích hoạt đúng luồng bot và liên kết đúng tài khoản AI chuyên biệt!
-              </p>
-            </div>
-            <div class="flex flex-col sm:flex-row items-center gap-3">
-              <div class="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/10 text-center w-full sm:w-auto">
-                <p class="text-[10px] uppercase font-bold text-purple-200">Hạn Ngạch Cấp Bot</p>
-                <p class="text-xl font-black text-amber-300 mt-0.5" id="virtual-kpi-quota">Không Giới Hạn (Unlimited)</p>
-              </div>
-              <button onclick="openAddVirtualBotModal()" class="w-full sm:w-auto px-4 py-3 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-2xl text-xs font-black flex items-center justify-center space-x-2 shadow-lg shadow-amber-400/20 cursor-pointer transition-all">
-                <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                <span>+ Thêm Bot Mới</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Dynamic Grid of Virtual Bots -->
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="virtual-bots-container">
-            <!-- Dynamically populated -->
-          </div>
-
-          <!-- Simulator Box -->
-          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-            <div class="flex items-center justify-between">
-              <div>
-                <h4 class="font-extrabold text-sm text-slate-900 flex items-center space-x-2">
-                  <i data-lucide="terminal" class="w-4 h-4 text-purple-600"></i>
-                  <span>Khung Thử Nghiệm Định Tuyến Mã Bot Trực Tiếp</span>
-                </h4>
-                <p class="text-xs text-slate-500 mt-0.5">Gõ thử tin nhắn kèm mã để kiểm tra xem hệ thống phân luồng tới đúng Bot nào.</p>
+                <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                  <span>Bước 1: Chọn Zalo Bot Điều Hành (Thân Xác / Phiên Kết Nối)</span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800">Chọn Bot Trước</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Click chọn Zalo Bot bên dưới để quản trị toàn bộ Cookie đã nạp, Trợ lý ảo mã #CODE và Khung chat riêng biệt của Bot đó.</p>
               </div>
             </div>
             <div class="flex items-center space-x-2">
-              <input type="text" id="simulator-input" placeholder="Ví dụ: #MEDIA: Tạo video bể cá san hô hoặc #KETOAN Tính tiền tuần này" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono focus:outline-none focus:border-purple-600">
-              <button onclick="simulateBotRouting()" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer">
-                <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                <span>Kiểm Tra Phân Luồng</span>
+              <button onclick="openAddAssistantModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>+ Quét QR Nạp Zalo Bot</span>
               </button>
             </div>
-            <div id="simulator-result" class="hidden p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-700"></div>
+          </div>
+
+          <!-- Master Zalo Bot Cards Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5" id="zalo-bot-master-selector">
+            <!-- Dynamically populated by JS: cards for each Zalo bot -->
+          </div>
+        </div>
+
+        <!-- TẦNG 2: KHÔNG GIAN BÊN TRONG ZALO BOT ĐÃ CHỌN (WORKSPACE ĐỒNG BỘ) -->
+        <div class="space-y-6" id="active-zalo-bot-workspace">
+          <!-- Active Bot Summary Banner -->
+          <div id="active-zalo-bot-summary-banner" class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-indigo-500/20">
+            <!-- Dynamically populated -->
+          </div>
+
+          <!-- Bot Internal Navigation Subtabs Bar -->
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <button onclick="switchBotWorkspaceSubTab('cookies')" id="btn-bot-subtab-cookies" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-amber-500 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer">
+                <i data-lucide="cookie" class="w-4 h-4"></i>
+                <span>🍪 Trợ Lý AI & Cookie Đã Nạp</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-black/20 text-white" id="badge-bot-cookies-count">0 Acc</span>
+              </button>
+              <button onclick="switchBotWorkspaceSubTab('codes')" id="btn-bot-subtab-codes" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center space-x-1.5 cursor-pointer">
+                <i data-lucide="hash" class="w-4 h-4 text-purple-600"></i>
+                <span>🏷️ Trợ Lý Ảo Theo Mã (#CODE)</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-purple-100 text-purple-800" id="badge-bot-codes-count">0 Mã</span>
+              </button>
+              <button onclick="switchBotWorkspaceSubTab('groups')" id="btn-bot-subtab-groups" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center space-x-1.5 cursor-pointer">
+                <i data-lucide="users" class="w-4 h-4 text-blue-600"></i>
+                <span>👥 Nhóm Zalo Phụ Trách</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-100 text-blue-800" id="badge-bot-groups-count">0 Nhóm</span>
+              </button>
+              <button onclick="switchBotWorkspaceSubTab('chat')" id="btn-bot-subtab-chat" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center space-x-1.5 cursor-pointer">
+                <i data-lucide="messages-square" class="w-4 h-4 text-emerald-600"></i>
+                <span>💬 Khung Chat Riêng Biệt Từng Mã</span>
+                <span class="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-100 text-emerald-800">Cô Lập 100%</span>
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+              <button onclick="openAssignCookieModal()" class="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer">
+                <i data-lucide="link" class="w-4 h-4"></i>
+                <span>🔗 Nạp Thêm Cookie Vào Bot Này</span>
+              </button>
+              <button onclick="openAddVirtualBotModal()" class="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>+ Tạo Mã Trợ Lý Mới</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW A: COOKIES ĐÃ NẠP VÀO BOT NÀY -->
+          <div id="bot-view-cookies" class="space-y-6">
+            <!-- Assigned Cookies Cards Container -->
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                    <span>Danh Sách Cookie AI Đang Cấp Cho Bot Này (Bộ Não AI)</span>
+                  </h3>
+                  <p class="text-xs text-slate-500 mt-0.5">Các tài khoản này chịu trách nhiệm sinh văn bản, phân tích dữ liệu và render video TVC cho Zalo Bot.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button onclick="openAssignCookieModal()" class="px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-xl text-xs font-bold flex items-center space-x-1 cursor-pointer">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span>Nạp Thêm Cookie</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="bot-assigned-cookies-container">
+                <!-- Dynamically rendered -->
+              </div>
+            </div>
+
+            <!-- Auto OTP & Local Captcha Solve Panel -->
+            <div class="bg-white rounded-3xl border border-indigo-200/80 shadow-md shadow-indigo-100/50 p-6 space-y-4">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-50 pb-4">
+                <div class="flex items-center space-x-3">
+                  <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
+                    ⚡
+                  </div>
+                  <div>
+                    <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Tự Động Nạp Mail | Password & Đăng Nhập Local Giải Captcha</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Tự động lấy mã OTP Microsoft, hoặc mở Chrome thật trên màn hình Sever để Sếp tự giải captcha trực tiếp.</p>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">Auto OTP & Local Solve</span>
+                </div>
+              </div>
+
+              <div class="space-y-3">
+                <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span>Danh Sách Tài Khoản (mỗi dòng 1 tài khoản: <code class="font-mono text-indigo-600 font-semibold">email|password</code> hoặc <code class="font-mono text-indigo-600 font-semibold">email|pass|refreshToken</code>)</span>
+                  <span id="autoAccCount" class="text-slate-400 font-mono text-[11px]">0 tài khoản</span>
+                </div>
+                <textarea id="autoAccInput" rows="3" oninput="updateAutoAccCount()" placeholder="user1@hotmail.com|password123&#10;user2@hotmail.com|password456|refreshToken|client_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"></textarea>
+
+                <div class="flex flex-col sm:flex-row items-center gap-2">
+                  <input type="text" id="sheetUrl" placeholder="Hoặc dán link Google Sheet (cột: email | password | refreshToken | client_id)" class="flex-1 w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none font-medium">
+                  <button onclick="loadFromGoogleSheet()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
+                    <i data-lucide="sheet" class="w-4 h-4 text-emerald-600"></i>
+                    <span>Tải Từ Sheet</span>
+                  </button>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div class="flex flex-wrap items-center gap-4 text-xs">
+                    <label class="flex items-center space-x-2 cursor-pointer text-slate-600 font-semibold">
+                      <input type="checkbox" id="autoAccSkip" checked class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                      <span>Bỏ qua tài khoản đang hoạt động (chỉ chạy lại khi expired)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer text-slate-600 font-semibold">
+                      <input type="checkbox" id="autoAccOverwrite" checked class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                      <span>Ghi đè tài khoản đã có</span>
+                    </label>
+                  </div>
+
+                  <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                    <button onclick="startAutoExtract()" id="btnStartAutoAcc" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-indigo-600/20 transition-all cursor-pointer">
+                      <i data-lucide="zap" class="w-4 h-4 text-amber-300"></i>
+                      <span>⚡ Bắt Đầu Đăng Nhập & Nạp Vào Pool</span>
+                    </button>
+                    <button onclick="startLocalLogin()" id="btnStartLocalAcc" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-purple-600/20 transition-all cursor-pointer" title="Mở Chrome trên máy Sever để tự giải captcha">
+                      <i data-lucide="monitor" class="w-4 h-4"></i>
+                      <span>🖥️ Đăng Nhập Local (Tự Giải Captcha)</span>
+                    </button>
+                    <button onclick="openImportCookieModal()" class="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer" title="Dán cookie JSON trực tiếp">
+                      <i data-lucide="cookie" class="w-4 h-4"></i>
+                      <span>+ Nạp Cookie</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Progress & Logs Box -->
+                <div id="autoAccProgress" class="hidden pt-3 border-t border-slate-100 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span id="autoAccStatus" class="font-bold text-indigo-600">Đang chuẩn bị...</span>
+                    <span id="autoAccRatio" class="font-mono text-slate-400 font-bold">0/0</span>
+                  </div>
+                  <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                    <div id="autoAccBar" class="bg-indigo-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                  </div>
+                  <pre id="autoAccLogs" class="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-[11px] max-h-36 overflow-y-auto leading-relaxed border border-slate-800"></pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Full Pool Reference Table -->
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Kho Toàn Bộ Cookie Studio Sẵn Có</h3>
+                  <p class="text-xs text-slate-500 mt-0.5">Sếp có thể bấm [Gán Vào Zalo Bot] để cấp thêm tài khoản cho Bot đang chọn.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button onclick="checkPoolHealth()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1 cursor-pointer">
+                    <i data-lucide="activity" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>Kiểm Tra Sức Khỏe Pool</span>
+                  </button>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-600">
+                  <thead class="bg-slate-50 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                    <tr>
+                      <th class="py-3 px-4">Tên Tài Khoản</th>
+                      <th class="py-3 px-4 text-center">Trạng Thái Cookie</th>
+                      <th class="py-3 px-4">⚡ Mức Sử Dụng & Token</th>
+                      <th class="py-3 px-4 text-center">⏱️ Chu Kỳ Đặt Lại (Tuần)</th>
+                      <th class="py-3 px-4 text-center">Trạng Thái Với Bot Này</th>
+                      <th class="py-3 px-4 text-right">Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100 font-medium" id="pool-table-body">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW B: TRỢ LÝ ẢO THEO MÃ (#CODE) CỦA BOT NÀY -->
+          <div id="bot-view-codes" class="space-y-6 hidden">
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                    <span>Trợ Lý Ảo Theo Mã (#CODE) Phụ Trách Bởi Bot Này</span>
+                  </h3>
+                  <p class="text-xs text-slate-500 mt-0.5">Mỗi mã đại diện cho 1 nghiệp vụ chuyên sâu với Persona, Prompt học việc và Khung Chat độc lập 100%.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button onclick="openAddVirtualBotModal()" class="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>+ Khởi Tạo Mã Trợ Lý Mới</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="bot-virtual-bots-container">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW C: NHÓM ZALO PHỤ TRÁCH -->
+          <div id="bot-view-groups" class="space-y-6 hidden">
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center space-x-2">
+                    <span>Nhóm Zalo Đang Được Phụ Trách Bởi Bot Này</span>
+                  </h3>
+                  <p class="text-xs text-slate-500 mt-0.5">Zalo Bot đang lắng nghe và phản hồi tin nhắn trong các nhóm này theo chính sách phân quyền.</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="bot-assigned-groups-container">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW D: KHUNG CHAT RIÊNG BIỆT CHO TỪNG TÍNH NĂNG (#CODE DEDICATED CONSOLE) -->
+          <div id="bot-view-chat" class="space-y-6 hidden">
+            <div class="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden flex flex-col h-[750px]">
+              <!-- Chat Console Top Bar: Alert & Code Pills -->
+              <div class="p-4 bg-slate-900 text-white border-b border-slate-800 space-y-3 flex-shrink-0">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div class="flex items-center space-x-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <h3 class="text-sm font-black tracking-wide text-white uppercase">Khung Chat Riêng Biệt Cho Từng Tính Năng (#CODE)</h3>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                      🔒 Cô Lập 100% Ngữ Cảnh
+                    </span>
+                    <button onclick="clearDedicatedChatHistory()" class="px-2.5 py-1 bg-white/10 hover:bg-rose-500/80 text-slate-300 hover:text-white rounded-lg text-[10px] font-bold transition-all flex items-center space-x-1 cursor-pointer">
+                      <i data-lucide="trash-2" class="w-3 h-3"></i>
+                      <span>Xóa Lịch Sử Mã Này</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Horizontal Code Switcher Pills -->
+                <div class="flex items-center space-x-2 overflow-x-auto pb-1" id="dedicated-chat-code-pills">
+                  <!-- Dynamically populated: pills for #MEDIA, #HERMES, #KETOAN, #SALE... -->
+                </div>
+              </div>
+
+              <!-- Chat Sub-header Info -->
+              <div class="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 flex-shrink-0">
+                <div class="flex items-center space-x-2" id="dedicated-chat-active-info">
+                  <!-- e.g. "Đang trò chuyện với: #MEDIA (Bot Media & Video TVC Studio) • Bộ não: syncere1812031999" -->
+                </div>
+                <div class="text-[11px] text-slate-400 font-mono">
+                  <span>Session: <strong class="text-indigo-600" id="dedicated-chat-session-id">session_MEDIA</strong></span>
+                </div>
+              </div>
+
+              <!-- Chat Messages Stream (Scrollable) -->
+              <div class="flex-1 p-5 overflow-y-auto space-y-4 bg-slate-100/50" id="dedicated-chat-messages-container">
+                <!-- Dynamically populated from localStorage['hermes_chat_' + botId + '_' + code] -->
+              </div>
+
+              <!-- Chat Input Bar -->
+              <div class="p-4 bg-white border-t border-slate-200 flex-shrink-0 space-y-2">
+                <form onsubmit="handleSendDedicatedChat(event)" class="flex items-center space-x-2">
+                  <div class="px-3 py-2.5 bg-purple-100 text-purple-800 font-mono font-black text-xs rounded-xl flex items-center space-x-1" id="dedicated-chat-input-code-badge">
+                    #MEDIA
+                  </div>
+                  <input type="text" id="dedicated-chat-input" placeholder="Nhập tin nhắn trao đổi riêng với tính năng này..." class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-purple-600 font-medium">
+                  <button type="submit" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow-md shadow-purple-600/20 cursor-pointer">
+                    <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                    <span>Gửi</span>
+                  </button>
+                </form>
+                <div class="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                  <span>💡 Tip: Mọi trao đổi trong khung chat này chỉ lưu giữ cho mã đang chọn, không chia sẻ sang các mã khác.</span>
+                  <span>Engine: <strong>Studio AI Engine (Cổng 8770)</strong></span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1453,6 +1460,46 @@ def build_app():
     </div>
   </div>
 
+    <!-- ==================== MODAL: GÁN COOKIE VÀO ZALO BOT ==================== -->
+  <div id="modal-assign-cookie" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+            <i data-lucide="cookie" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-black text-slate-900 text-sm">Nạp / Gán Cookie Vào Zalo Bot</h3>
+            <p class="text-[11px] text-slate-500" id="assign-cookie-modal-subtitle">Chọn các tài khoản Cookie Pool để cấp bộ não cho Zalo Bot</p>
+          </div>
+        </div>
+        <button onclick="closeAssignCookieModal()" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <p class="text-xs text-slate-600">
+          Tick chọn một hoặc nhiều tài khoản Cookie AI bên dưới để gán tải cho Zalo Bot này. Khi xử lý công việc và render video TVC, Zalo Bot sẽ tự động luân phiên các tài khoản đã chọn.
+        </p>
+
+        <div id="assign-cookie-checkboxes-list" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+          <!-- Dynamically populated -->
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeAssignCookieModal()" class="px-4 py-2 text-slate-500 hover:text-slate-800 text-xs font-bold rounded-xl">
+            Đóng
+          </button>
+          <button type="button" onclick="saveAssignedCookies()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/20 flex items-center space-x-1.5 cursor-pointer">
+            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+            <span>Lưu & Cấp Cookie Cho Bot</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== JAVASCRIPT LOGIC ==================== -->
   <script>
     const SYSTEM_DATABASE = {{
@@ -1521,59 +1568,318 @@ def build_app():
       lucide.createIcons();
     }}
 
-    // Subtab Navigation between Zalo Bots, Virtual Bots, and Cookie Pool
-    function switchFleetSubTab(subTab) {{
-      CURRENT_FLEET_SUBTAB = subTab;
-      const viewZalo = document.getElementById('subview-zalo');
-      const viewVirtual = document.getElementById('subview-virtual');
-      const viewPool = document.getElementById('subview-pool');
-      const btnZalo = document.getElementById('btn-subtab-zalo');
-      const btnVirtual = document.getElementById('btn-subtab-virtual');
-      const btnPool = document.getElementById('btn-subtab-pool');
+    // ==================== ZALO-BOT-FIRST ARCHITECTURE LOGIC ====================
+    let CURRENT_BOT_SUBTAB = 'cookies';
+    let CURRENT_DEDICATED_CODE = '#MEDIA';
 
-      if (viewZalo) viewZalo.classList.add('hidden');
-      if (viewVirtual) viewVirtual.classList.add('hidden');
-      if (viewPool) viewPool.classList.add('hidden');
+    function selectZaloBot(botId) {{
+      ACTIVE_ASSISTANT_ID = botId;
+      saveFleetToStorage();
+      renderAssistantsFleet();
+    }}
 
-      if (btnZalo) btnZalo.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center space-x-1.5";
-      if (btnVirtual) btnVirtual.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center space-x-1.5";
-      if (btnPool) btnPool.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center space-x-1.5";
-
-      if (subTab === 'zalo') {{
-        if (viewZalo) viewZalo.classList.remove('hidden');
-        if (btnZalo) btnZalo.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-sm flex items-center space-x-1.5";
-      }} else if (subTab === 'virtual') {{
-        if (viewVirtual) viewVirtual.classList.remove('hidden');
-        if (btnVirtual) btnVirtual.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-purple-600 text-white shadow-sm flex items-center space-x-1.5";
-        renderVirtualBots();
-      }} else {{
-        if (viewPool) viewPool.classList.remove('hidden');
-        if (btnPool) btnPool.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-amber-600 text-white shadow-sm flex items-center space-x-1.5";
-      }}
+    function switchBotWorkspaceSubTab(tab) {{
+      CURRENT_BOT_SUBTAB = tab;
+      const tabs = ['cookies', 'codes', 'groups', 'chat'];
+      tabs.forEach(t => {{
+        const view = document.getElementById(`bot-view-${{t}}`);
+        const btn = document.getElementById(`btn-bot-subtab-${{t}}`);
+        if (view) {{
+          if (t === tab) view.classList.remove('hidden');
+          else view.classList.add('hidden');
+        }}
+        if (btn) {{
+          if (t === tab) {{
+            if (t === 'cookies') btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-amber-500 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer";
+            else if (t === 'codes') btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-purple-600 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer";
+            else if (t === 'groups') btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-blue-600 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer";
+            else btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-emerald-600 text-white shadow-sm flex items-center space-x-1.5 cursor-pointer";
+          }} else {{
+            btn.className = "px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center space-x-1.5 cursor-pointer";
+          }}
+        }}
+      }});
       lucide.createIcons();
     }}
 
-    // Render Virtual Bots (1 Zalo -> Nhiều Bot Độc Lập Theo Mã)
-    function renderVirtualBots() {{
-      const container = document.getElementById('virtual-bots-container');
-      const badgeCount = document.getElementById('badge-virtual-count');
+    function renderAssistantsFleet() {{
+      const topSelect = document.getElementById('assistant-top-selector');
+      const kpiTotal = document.getElementById('fleet-total-count');
+      const kpiOverview = document.getElementById('kpi-overview-assistants');
+
+      if (kpiTotal) kpiTotal.innerText = `${{ASSISTANTS_FLEET.length}} Trợ Lý`;
+      if (kpiOverview) kpiOverview.innerText = `${{ASSISTANTS_FLEET.length}} Bot • ${{POOL_ACCOUNTS.length}} Cookie`;
+
+      // Top select dropdown
+      if (topSelect) {{
+        topSelect.innerHTML = ASSISTANTS_FLEET.map(a => `
+          <option value="${{a.id}}" ${{a.id === ACTIVE_ASSISTANT_ID ? 'selected' : ''}}>
+            ${{a.name}} (${{a.platform}})
+          </option>
+        `).join('');
+      }}
+
+      // 1. Render Master Zalo Bot Cards
+      renderZaloBotMasterSelector();
+
+      // 2. Render Active Zalo Bot Workspace
+      renderActiveBotWorkspace();
+
+      lucide.createIcons();
+    }}
+
+    function renderZaloBotMasterSelector() {{
+      const container = document.getElementById('zalo-bot-master-selector');
+      if (!container) return;
+
+      container.innerHTML = ASSISTANTS_FLEET.map(bot => {{
+        const isSelected = (bot.id === ACTIVE_ASSISTANT_ID);
+        const isOnline = (bot.status === 'online');
+        const cookieCount = (bot.assigned_cookies || []).length;
+        const groupCount = (bot.assigned_groups || []).length;
+
+        // Virtual bots count for this assistant
+        let codeCount = 0;
+        (TENANTS_DATA.tenants || []).forEach(t => {{
+          (t.bots || []).forEach(b => {{
+            if (!bot.assigned_bot_ids || bot.assigned_bot_ids.includes(b.bot_id) || bot.id === 'ast_715842971730458158') {{
+              codeCount++;
+            }}
+          }});
+        }});
+
+        return `
+          <div onclick="selectZaloBot('${{bot.id}}')" class="p-4 rounded-2xl border transition-all cursor-pointer ${{isSelected ? 'bg-indigo-50/50 border-indigo-600 ring-2 ring-indigo-600/20 shadow-md' : 'bg-white border-slate-200 hover:border-slate-300 shadow-sm'}} flex flex-col justify-between space-y-3">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center space-x-3">
+                <div class="relative w-11 h-11 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
+                  <img src="${{bot.avatar}}" alt="${{bot.name}}" class="w-full h-full object-cover">
+                  <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${{isOnline ? 'bg-emerald-500' : 'bg-slate-400'}}"></span>
+                </div>
+                <div>
+                  <h4 class="font-extrabold text-xs text-slate-900 leading-tight line-clamp-1">${{bot.name}}</h4>
+                  <p class="text-[10px] text-slate-500 font-medium mt-0.5">${{bot.platform}}</p>
+                  <span class="text-[10px] text-indigo-600 font-mono font-bold">Cổng ${{bot.bridge_port}}</span>
+                </div>
+              </div>
+              ${{isSelected ? '<span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-indigo-600 text-white uppercase tracking-wider">Đang Chọn</span>' : ''}}
+            </div>
+
+            <!-- Quick Metrics Pills -->
+            <div class="grid grid-cols-3 gap-1 text-[10px] text-center pt-2 border-t border-slate-100">
+              <div class="bg-amber-50 text-amber-800 rounded-lg py-1 font-bold">
+                <span>🍪 ${{cookieCount}} Acc</span>
+              </div>
+              <div class="bg-purple-50 text-purple-800 rounded-lg py-1 font-bold">
+                <span>🏷️ ${{codeCount}} Mã</span>
+              </div>
+              <div class="bg-blue-50 text-blue-800 rounded-lg py-1 font-bold">
+                <span>👥 ${{groupCount}} G</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }}).join('');
+    }}
+
+    function renderActiveBotWorkspace() {{
+      const currentBot = ASSISTANTS_FLEET.find(a => a.id === ACTIVE_ASSISTANT_ID) || ASSISTANTS_FLEET[0];
+      if (!currentBot) return;
+
+      // Render Summary Banner
+      const banner = document.getElementById('active-zalo-bot-summary-banner');
+      if (banner) {{
+        const isOnline = (currentBot.status === 'online');
+        const cookieCount = (currentBot.assigned_cookies || []).length;
+        const groupCount = (currentBot.assigned_groups || []).length;
+
+        // Count assigned codes
+        let codeCount = 0;
+        (TENANTS_DATA.tenants || []).forEach(t => {{
+          (t.bots || []).forEach(b => {{
+            if (!currentBot.assigned_bot_ids || currentBot.assigned_bot_ids.includes(b.bot_id) || currentBot.id === 'ast_715842971730458158') {{
+              codeCount++;
+            }}
+          }});
+        }});
+
+        banner.innerHTML = `
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div class="flex items-center space-x-4">
+              <div class="relative w-16 h-16 rounded-2xl overflow-hidden bg-white/10 border-2 border-white/20 flex-shrink-0">
+                <img src="${{currentBot.avatar}}" alt="${{currentBot.name}}" class="w-full h-full object-cover">
+                <span class="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-slate-900 ${{isOnline ? 'bg-emerald-400' : 'bg-slate-400'}}"></span>
+              </div>
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 class="text-xl font-black tracking-tight text-white">${{currentBot.name}}</h2>
+                  <span class="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase ${{isOnline ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/30' : 'bg-slate-500/30 text-slate-300 border border-slate-400/30'}}">
+                    ${{isOnline ? '🟢 Hoạt Động (Online)' : '⚪ Tạm Dừng'}}
+                  </span>
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-mono bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                    Cổng Bridge: ${{currentBot.bridge_port}}
+                  </span>
+                </div>
+                <p class="text-xs text-indigo-200 mt-1 max-w-xl italic">
+                  "${{currentBot.persona}}"
+                </p>
+                <div class="flex items-center space-x-3 text-[11px] text-slate-400 font-mono mt-1">
+                  <span>UID: <strong class="text-slate-200">${{currentBot.uid}}</strong></span>
+                  <span>•</span>
+                  <span>SĐT: <strong class="text-slate-200">${{currentBot.phone}}</strong></span>
+                  <span>•</span>
+                  <span>Bộ Nhớ: <strong class="text-slate-200">${{currentBot.memory_mb || 64}} MB</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Action Counters -->
+            <div class="flex flex-wrap items-center gap-2.5">
+              <div class="bg-white/10 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/10 text-center">
+                <span class="text-[10px] text-amber-300 uppercase font-black block">Cookie Đã Nạp</span>
+                <span class="text-lg font-black text-white">${{cookieCount}} Tài Khoản</span>
+              </div>
+              <div class="bg-white/10 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/10 text-center">
+                <span class="text-[10px] text-purple-300 uppercase font-black block">Trợ Lý Mã #CODE</span>
+                <span class="text-lg font-black text-white">${{codeCount}} Mã</span>
+              </div>
+              <div class="bg-white/10 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/10 text-center">
+                <span class="text-[10px] text-blue-300 uppercase font-black block">Nhóm Zalo</span>
+                <span class="text-lg font-black text-white">${{groupCount}} Nhóm</span>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Update Subtab Badges
+        const bCookies = document.getElementById('badge-bot-cookies-count');
+        const bCodes = document.getElementById('badge-bot-codes-count');
+        const bGroups = document.getElementById('badge-bot-groups-count');
+        if (bCookies) bCookies.innerText = `${{cookieCount}} Acc`;
+        if (bCodes) bCodes.innerText = `${{codeCount}} Mã`;
+        if (bGroups) bGroups.innerText = `${{groupCount}} Nhóm`;
+      }}
+
+      // Render Subtab 1: Assigned Cookies
+      renderBotAssignedCookies(currentBot);
+
+      // Render Subtab 2: Virtual Bots (#CODE)
+      renderBotAssignedCodes(currentBot);
+
+      // Render Subtab 3: Assigned Groups
+      renderBotAssignedGroups(currentBot);
+
+      // Render Subtab 4: Dedicated Isolated Chat Console
+      renderDedicatedChatPills(currentBot);
+    }}
+
+    function renderBotAssignedCookies(currentBot) {{
+      const container = document.getElementById('bot-assigned-cookies-container');
+      if (!container) return;
+
+      const assignedNames = currentBot.assigned_cookies || [];
+      if (assignedNames.length === 0) {{
+        container.innerHTML = `
+          <div class="col-span-full py-8 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl space-y-2">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xl mx-auto">
+              🍪
+            </div>
+            <p class="text-xs font-bold text-slate-700">Zalo Bot này chưa được nạp tài khoản Cookie AI nào!</p>
+            <p class="text-[11px] text-slate-400">Hãy bấm nút "Nạp Thêm Cookie Vào Bot Này" để cấp bộ não AI cho Bot xử lý tin nhắn & render video TVC.</p>
+            <button onclick="openAssignCookieModal()" class="mt-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer">
+              🔗 Nạp Cookie Ngay
+            </button>
+          </div>
+        `;
+        return;
+      }}
+
+      container.innerHTML = assignedNames.map(accName => {{
+        const poolAcc = POOL_ACCOUNTS.find(p => p.name === accName) || {{
+          name: accName,
+          file: `${{accName}}.json`,
+          status: 'ready',
+          video_state: 'ok',
+          avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${{accName}}`,
+          tokens_used: 120,
+          tokens_total: 500,
+          used_percent: 24,
+          reset_time_str: 'Còn 6 ngày 9h'
+        }};
+
+        const isReady = (poolAcc.status === 'ready');
+        const usedPct = poolAcc.used_percent || 20;
+
+        return `
+          <div class="bg-slate-50/70 p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3 hover:border-amber-400 transition-all">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 overflow-hidden flex-shrink-0">
+                  <img src="${{poolAcc.avatar}}" class="w-full h-full object-cover">
+                </div>
+                <div>
+                  <h4 class="font-mono font-bold text-xs text-slate-900">${{poolAcc.name}}</h4>
+                  <p class="text-[10px] text-slate-400 font-mono">${{poolAcc.file}}</p>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${{isReady ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}}">
+                ${{isReady ? '🟢 Ready' : '🔴 Expired'}}
+              </span>
+            </div>
+
+            <!-- Token progress -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-slate-500">Mức dùng tuần:</span>
+                <span class="font-bold text-slate-700">${{usedPct}}%</span>
+              </div>
+              <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                <div class="h-full rounded-full bg-emerald-500" style="width: ${{Math.max(5, usedPct)}}%"></div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-200 flex items-center justify-between text-[10px]">
+              <span class="text-slate-500 font-medium">Reset: ${{poolAcc.reset_time_str || 'Hàng tuần'}}</span>
+              <button onclick="unassignCookieFromBot('${{accName}}')" class="text-rose-500 hover:text-rose-700 font-bold hover:bg-rose-50 px-2 py-1 rounded-lg transition-all" title="Bỏ gán cookie này khỏi bot">
+                Gỡ bỏ
+              </button>
+            </div>
+          </div>
+        `;
+      }}).join('');
+    }}
+
+    function renderBotAssignedCodes(currentBot) {{
+      const container = document.getElementById('bot-virtual-bots-container');
       if (!container) return;
 
       const allBots = [];
       (TENANTS_DATA.tenants || []).forEach(t => {{
         (t.bots || []).forEach(b => {{
-          allBots.push({{ ...b, tenant_id: t.tenant_id, tenant_name: t.name }});
+          if (!currentBot.assigned_bot_ids || currentBot.assigned_bot_ids.includes(b.bot_id) || currentBot.id === 'ast_715842971730458158') {{
+            allBots.push({{ ...b, tenant_id: t.tenant_id, tenant_name: t.name }});
+          }}
         }});
       }});
 
-      if (badgeCount) badgeCount.innerText = `${{allBots.length}} Bot`;
+      if (allBots.length === 0) {{
+        container.innerHTML = `
+          <div class="col-span-full py-8 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl space-y-2">
+            <p class="text-xs font-bold text-slate-700">Chưa có Trợ Lý Ảo theo Mã (#CODE) nào được gán cho Bot này!</p>
+            <button onclick="openAddVirtualBotModal()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer">
+              + Tạo Mã Mới Ngay
+            </button>
+          </div>
+        `;
+        return;
+      }}
 
       container.innerHTML = allBots.map(b => {{
         const isVideo = (b.mode === 'video');
         const aliasesStr = (b.aliases && b.aliases.length) ? b.aliases.join(', ') : '';
 
         return `
-          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 hover:shadow-md transition-all">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 hover:shadow-md hover:border-purple-300 transition-all">
             <div class="flex items-start justify-between">
               <div class="flex items-center space-x-3">
                 <div class="w-11 h-11 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold text-lg border border-purple-200">
@@ -1582,28 +1888,29 @@ def build_app():
                 <div>
                   <h4 class="font-extrabold text-sm text-slate-900">${{b.name}}</h4>
                   <div class="flex items-center space-x-1.5 mt-0.5">
-                    <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-purple-100 text-purple-800 font-mono">Mã: ${{b.routing_code}}</span>
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 font-mono">${{b.routing_code}}</span>
                     ${{aliasesStr ? `<span class="text-[10px] text-slate-400 font-mono">(` + aliasesStr + `)</span>` : ''}}
                   </div>
                 </div>
               </div>
               <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold ${{isVideo ? 'bg-pink-50 text-pink-700 border border-pink-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}}">
-                ${{isVideo ? '🎬 Render Video' : '💬 Chat Nghiệp Vụ'}}
+                ${{isVideo ? '🎬 Video TVC' : '💬 Nghiệp Vụ'}}
               </span>
             </div>
 
-            <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 italic">
+            <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 italic line-clamp-2">
               "${{b.persona}}"
             </p>
 
             <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
               <div class="flex items-center space-x-1 font-mono">
-                <span>AI Acc:</span>
-                <strong class="text-slate-800">${{b.linked_pool_account || 'studio-pool'}}</strong>
+                <span>AI Cookie:</span>
+                <strong class="text-indigo-600 font-bold">${{b.linked_pool_account || 'studio-pool'}}</strong>
               </div>
               <div class="flex items-center space-x-2">
-                <button onclick="testQuickMessage('${{b.routing_code}}')" class="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold rounded-lg text-[10px] border border-purple-200">
-                  🧪 Test
+                <button onclick="openDedicatedChat('${{b.routing_code}}', '${{b.name}}', '${{b.linked_pool_account || 'studio-pool'}}')" class="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-xl text-[10px] border border-emerald-200 flex items-center space-x-1 cursor-pointer">
+                  <i data-lucide="message-square" class="w-3 h-3"></i>
+                  <span>Khung Chat Riêng</span>
                 </button>
                 <button onclick="deleteVirtualBot('${{b.tenant_id}}', '${{b.bot_id}}')" class="text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 rounded-lg transition-all" title="Xóa Bot">
                   <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -1613,8 +1920,330 @@ def build_app():
           </div>
         `;
       }}).join('');
+    }}
 
+    function renderBotAssignedGroups(currentBot) {{
+      const container = document.getElementById('bot-assigned-groups-container');
+      if (!container) return;
+
+      const groupIds = currentBot.assigned_groups || [];
+      if (groupIds.length === 0) {{
+        container.innerHTML = `
+          <div class="col-span-full py-8 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl">
+            <p class="text-xs font-bold text-slate-700">Bot này hiện chưa tham gia nhóm Zalo nào.</p>
+          </div>
+        `;
+        return;
+      }}
+
+      container.innerHTML = groupIds.map(gid => {{
+        const ginfo = SYSTEM_DATABASE.groups[gid] || {{
+          name: `Nhóm Zalo (${{gid}})`,
+          avatar: '👥',
+          memberCount: 'Đang kết nối'
+        }};
+
+        return `
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 text-[#0066cc] flex items-center justify-center font-bold text-base flex-shrink-0">
+                  ${{ginfo.avatar && ginfo.avatar.startsWith('http') ? `<img src="${{ginfo.avatar}}" class="w-full h-full object-cover rounded-xl">` : '👥'}}
+                </div>
+                <div>
+                  <h4 class="font-extrabold text-xs text-slate-900 line-clamp-1">${{ginfo.name}}</h4>
+                  <p class="text-[10px] text-slate-400 font-mono">${{gid}}</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <span class="text-slate-500 font-medium">${{ginfo.memberCount || 'Nhóm hoạt động'}}</span>
+              <button onclick="leaveGroupPhysical('${{gid}}', '${{ginfo.name}}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-[10px] border border-rose-200 flex items-center space-x-1 cursor-pointer">
+                <i data-lucide="log-out" class="w-3 h-3"></i>
+                <span>Thoát Nhóm</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }}).join('');
+    }}
+
+    // ==================== KHUNG CHAT RIÊNG BIỆT CHO TỪNG TÍNH NĂNG ====================
+    function openDedicatedChat(code, name, linkedAcc) {{
+      CURRENT_DEDICATED_CODE = code;
+      switchBotWorkspaceSubTab('chat');
+      switchDedicatedChatCode(code);
+    }}
+
+    function renderDedicatedChatPills(currentBot) {{
+      const container = document.getElementById('dedicated-chat-code-pills');
+      if (!container) return;
+
+      const codes = [];
+      (TENANTS_DATA.tenants || []).forEach(t => {{
+        (t.bots || []).forEach(b => {{
+          if (!currentBot.assigned_bot_ids || currentBot.assigned_bot_ids.includes(b.bot_id) || currentBot.id === 'ast_715842971730458158') {{
+            if (!codes.some(c => c.code === b.routing_code)) {{
+              codes.push({{ code: b.routing_code, name: b.name, mode: b.mode, account: b.linked_pool_account }});
+            }}
+          }}
+        }});
+      }});
+
+      if (codes.length === 0) {{
+        codes.push(
+          {{ code: '#MEDIA', name: 'Bot Media Studio', mode: 'video', account: 'syncere1812031999' }},
+          {{ code: '#HERMES', name: 'Trợ Lý Điều Hành', mode: 'chat', account: 'ellinabetheny4127' }},
+          {{ code: '#KETOAN', name: 'Bot Kế Toán & Excel', mode: 'chat', account: 'ellinabetheny4127' }}
+        );
+      }}
+
+      container.innerHTML = codes.map(c => {{
+        const isCurrent = (c.code === CURRENT_DEDICATED_CODE);
+        return `
+          <button onclick="switchDedicatedChatCode('${{c.code}}')" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 flex-shrink-0 cursor-pointer ${{isCurrent ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}}">
+            <span class="font-mono">${{c.code}}</span>
+            <span class="text-[10px] opacity-80">• ${{c.name}}</span>
+          </button>
+        `;
+      }}).join('');
+
+      switchDedicatedChatCode(CURRENT_DEDICATED_CODE);
+    }}
+
+    function switchDedicatedChatCode(code) {{
+      CURRENT_DEDICATED_CODE = code;
+
+      // Update pills appearance
+      const pills = document.querySelectorAll('#dedicated-chat-code-pills button');
+      pills.forEach(p => {{
+        if (p.innerText.includes(code)) {{
+          p.className = "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 flex-shrink-0 cursor-pointer bg-purple-600 text-white shadow-md";
+        }} else {{
+          p.className = "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 flex-shrink-0 cursor-pointer bg-slate-800 text-slate-300 hover:bg-slate-700";
+        }}
+      }});
+
+      // Update Sub-header
+      let matchedBot = null;
+      (TENANTS_DATA.tenants || []).forEach(t => {{
+        (t.bots || []).forEach(b => {{
+          if (b.routing_code === code) matchedBot = b;
+        }});
+      }});
+
+      const botName = matchedBot ? matchedBot.name : (code === '#MEDIA' ? 'Bot Media Studio' : code === '#HERMES' ? 'Trợ Lý Điều Hành' : 'Trợ Lý Kế Toán');
+      const botAcc = matchedBot ? matchedBot.linked_pool_account : 'studio-pool';
+
+      const infoEl = document.getElementById('dedicated-chat-active-info');
+      const sessEl = document.getElementById('dedicated-chat-session-id');
+      const badgeInput = document.getElementById('dedicated-chat-input-code-badge');
+
+      if (infoEl) infoEl.innerHTML = `<span class="font-bold text-slate-900">${{botName}}</span> <span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-mono text-[10px] font-bold">${{code}}</span> <span class="text-slate-400">• Bộ não AI: <strong class="text-indigo-600 font-mono">${{botAcc}}</strong></span>`;
+      if (sessEl) sessEl.innerText = `session_${{ACTIVE_ASSISTANT_ID.slice(-6)}}_${{code.replace('#', '')}}`;
+      if (badgeInput) badgeInput.innerText = code;
+
+      renderDedicatedChatMessages();
+    }}
+
+    function getDedicatedChatHistory() {{
+      const key = `hermes_chat_${{ACTIVE_ASSISTANT_ID}}_${{CURRENT_DEDICATED_CODE}}`;
+      try {{
+        const raw = localStorage.getItem(key);
+        if (raw) return JSON.parse(raw);
+      }} catch (e) {{}}
+
+      // Default welcome message for this code
+      return [
+        {{
+          sender: 'bot',
+          time: new Date().toLocaleTimeString('vi-VN', {{ hour: '2-digit', minute: '2-digit' }}),
+          text: `Dạ Sếp, Em là Trợ lý phụ trách tính năng ${{CURRENT_DEDICATED_CODE}}. Toàn bộ ngữ cảnh trong khung chat này được cô lập 100% dành riêng cho Sếp!`
+        }}
+      ];
+    }}
+
+    function saveDedicatedChatHistory(history) {{
+      const key = `hermes_chat_${{ACTIVE_ASSISTANT_ID}}_${{CURRENT_DEDICATED_CODE}}`;
+      try {{
+        localStorage.setItem(key, JSON.stringify(history));
+      }} catch (e) {{}}
+    }}
+
+    function renderDedicatedChatMessages() {{
+      const container = document.getElementById('dedicated-chat-messages-container');
+      if (!container) return;
+
+      const history = getDedicatedChatHistory();
+      container.innerHTML = history.map(msg => {{
+        const isUser = (msg.sender === 'user');
+        return `
+          <div class="flex ${{isUser ? 'justify-end' : 'justify-start'}}">
+            <div class="max-w-[80%] ${{isUser ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-white text-slate-800 border border-slate-200 rounded-2xl rounded-tl-none'}} p-3.5 shadow-sm space-y-1">
+              <div class="flex items-center space-x-2 text-[10px] ${{isUser ? 'text-indigo-200 justify-end' : 'text-slate-400'}} font-medium">
+                <span>${{isUser ? 'Sếp Hoàng' : CURRENT_DEDICATED_CODE}}</span>
+                <span>•</span>
+                <span>${{msg.time}}</span>
+              </div>
+              <p class="text-xs leading-relaxed whitespace-pre-wrap">${{msg.text}}</p>
+            </div>
+          </div>
+        `;
+      }}).join('');
+
+      container.scrollTop = container.scrollHeight;
+    }}
+
+    function handleSendDedicatedChat(event) {{
+      event.preventDefault();
+      const input = document.getElementById('dedicated-chat-input');
+      const text = input ? input.value.trim() : '';
+      if (!text) return;
+
+      const history = getDedicatedChatHistory();
+      const nowStr = new Date().toLocaleTimeString('vi-VN', {{ hour: '2-digit', minute: '2-digit' }});
+
+      history.push({{
+        sender: 'user',
+        time: nowStr,
+        text: text
+      }});
+      input.value = '';
+      saveDedicatedChatHistory(history);
+      renderDedicatedChatMessages();
+
+      // Simulate Bot Response isolated for this code
+      setTimeout(() => {{
+        let reply = '';
+        if (CURRENT_DEDICATED_CODE === '#MEDIA') {{
+          reply = `Dạ Sếp, Em là Trợ lý của sếp Hoàng.
+Em đã kích hoạt Studio AI Engine cho yêu cầu: "${{text}}". Em đang tiến hành tạo kịch bản hình ảnh và render video TVC độ nét cao cho Sếp ạ!`;
+        }} else if (CURRENT_DEDICATED_CODE === '#KETOAN') {{
+          reply = `Dạ Sếp, Em là Trợ lý của sếp Hoàng.
+Em đã ghi nhận số liệu và cập nhật bảng tính kế toán theo yêu cầu: "${{text}}". Dòng tiền và báo cáo đã sẵn sàng ạ!`;
+        }} else {{
+          reply = `Dạ Sếp, Em là Trợ lý của sếp Hoàng.
+Em đã tiếp nhận chỉ đạo [${{CURRENT_DEDICATED_CODE}}]: "${{text}}". Em xử lý ngay đây ạ!`;
+        }}
+
+        history.push({{
+          sender: 'bot',
+          time: new Date().toLocaleTimeString('vi-VN', {{ hour: '2-digit', minute: '2-digit' }}),
+          text: reply
+        }});
+        saveDedicatedChatHistory(history);
+        renderDedicatedChatMessages();
+      }}, 600);
+    }}
+
+    function clearDedicatedChatHistory() {{
+      if (!confirm(`Sếp có muốn xóa toàn bộ lịch sử trao đổi của riêng mã [${{CURRENT_DEDICATED_CODE}}] không?`)) return;
+      const key = `hermes_chat_${{ACTIVE_ASSISTANT_ID}}_${{CURRENT_DEDICATED_CODE}}`;
+      localStorage.removeItem(key);
+      renderDedicatedChatMessages();
+    }}
+
+    // ==================== MODAL GÁN COOKIE CHO BOT ====================
+    function openAssignCookieModal() {{
+      const currentBot = ASSISTANTS_FLEET.find(a => a.id === ACTIVE_ASSISTANT_ID) || ASSISTANTS_FLEET[0];
+      if (!currentBot) return;
+
+      const modal = document.getElementById('modal-assign-cookie');
+      const subtitle = document.getElementById('assign-cookie-modal-subtitle');
+      const listContainer = document.getElementById('assign-cookie-checkboxes-list');
+
+      if (subtitle) subtitle.innerText = `Cấp tài khoản AI Pool cho: "${{currentBot.name}}" (Cổng ${{currentBot.bridge_port}})`;
+
+      const assigned = currentBot.assigned_cookies || [];
+      if (listContainer) {{
+        listContainer.innerHTML = POOL_ACCOUNTS.map(acc => {{
+          const isChecked = assigned.includes(acc.name);
+          const isReady = (acc.status === 'ready');
+          return `
+            <label class="flex items-center space-x-3 p-2.5 rounded-xl border ${{isChecked ? 'bg-amber-50/60 border-amber-300' : 'bg-slate-50 border-slate-200'}} hover:bg-amber-50/30 cursor-pointer text-xs transition-all">
+              <input type="checkbox" name="assign_cookie_box" value="${{acc.name}}" ${{isChecked ? 'checked' : ''}} class="rounded text-amber-600 focus:ring-amber-500 w-4 h-4">
+              <div class="flex items-center space-x-2.5 flex-1">
+                <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 overflow-hidden flex-shrink-0">
+                  <img src="${{acc.avatar}}" class="w-full h-full object-cover">
+                </div>
+                <div>
+                  <span class="font-bold text-slate-900 block font-mono">${{acc.name}}</span>
+                  <span class="text-[10px] text-slate-400 font-mono">${{acc.file}}</span>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${{isReady ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}}">
+                ${{isReady ? '🟢 Ready' : '🔴 Expired'}}
+              </span>
+            </label>
+          `;
+        }}).join('');
+      }}
+
+      if (modal) modal.classList.remove('hidden');
       lucide.createIcons();
+    }}
+
+    function closeAssignCookieModal() {{
+      const modal = document.getElementById('modal-assign-cookie');
+      if (modal) modal.classList.add('hidden');
+    }}
+
+    function saveAssignedCookies() {{
+      const currentBot = ASSISTANTS_FLEET.find(a => a.id === ACTIVE_ASSISTANT_ID);
+      if (!currentBot) return;
+
+      const checked = Array.from(document.querySelectorAll('input[name="assign_cookie_box"]:checked')).map(cb => cb.value);
+      currentBot.assigned_cookies = checked;
+      saveFleetToStorage();
+      renderAssistantsFleet();
+      closeAssignCookieModal();
+
+      // Dispatch to Server
+      fetch('/api/assistants/assign-cookie', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ bot_id: currentBot.id, assigned_cookies: checked }})
+      }}).catch(() => {{}});
+
+      fetch('/api/assistants', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ action: 'assign_cookie', bot_id: currentBot.id, assigned_cookies: checked }})
+      }}).catch(() => {{}});
+
+      alert(`✅ Đã cấp thành công ${{checked.length}} tài khoản AI Cookie cho Trợ Lý "${{currentBot.name}}"!`);
+    }}
+
+    function unassignCookieFromBot(cookieName) {{
+      const currentBot = ASSISTANTS_FLEET.find(a => a.id === ACTIVE_ASSISTANT_ID);
+      if (!currentBot) return;
+
+      if (!confirm(`Sếp có muốn bỏ gán Cookie [${{cookieName}}] khỏi Bot "${{currentBot.name}}" không?`)) return;
+      currentBot.assigned_cookies = (currentBot.assigned_cookies || []).filter(c => c !== cookieName);
+      saveFleetToStorage();
+      renderAssistantsFleet();
+
+      fetch('/api/assistants/assign-cookie', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ bot_id: currentBot.id, assigned_cookies: currentBot.assigned_cookies }})
+      }}).catch(() => {{}});
+    }}
+
+    // Backwards Compatibility Functions
+    function switchFleetSubTab(subTab) {{
+      if (subTab === 'virtual') switchBotWorkspaceSubTab('codes');
+      else if (subTab === 'pool') switchBotWorkspaceSubTab('cookies');
+      else switchBotWorkspaceSubTab('cookies');
+    }}
+
+    function changeActiveAssistant(botId) {{
+      selectZaloBot(botId);
+    }}
+
+    function testQuickMessage(code) {{
+      openDedicatedChat(code);
     }}
 
     function openAddVirtualBotModal() {{
@@ -1661,7 +2290,7 @@ def build_app():
 
       TENANTS_DATA.tenants[0].bots.push(newBot);
       saveFleetToStorage();
-      renderVirtualBots();
+      renderAssistantsFleet();
       closeAddVirtualBotModal();
 
       fetch('/api/tenants', {{
@@ -1681,7 +2310,7 @@ def build_app():
         }}
       }});
       saveFleetToStorage();
-      renderVirtualBots();
+      renderAssistantsFleet();
 
       fetch('/api/tenants?action=delete', {{
         method: 'POST',
@@ -1690,159 +2319,13 @@ def build_app():
       }}).catch(() => {{}});
     }}
 
-    function testQuickMessage(code) {{
-      const simInput = document.getElementById('simulator-input');
-      if (simInput) {{
-        simInput.value = `${{code}}: Kiểm tra hoạt động của bot`;
-        simulateBotRouting();
-      }}
+    function renderVirtualBots() {{
+      // Alias to render active bot codes
+      const currentBot = ASSISTANTS_FLEET.find(a => a.id === ACTIVE_ASSISTANT_ID) || ASSISTANTS_FLEET[0];
+      if (currentBot) renderBotAssignedCodes(currentBot);
     }}
 
-    function simulateBotRouting() {{
-      const val = document.getElementById('simulator-input').value.trim();
-      const resEl = document.getElementById('simulator-result');
-      if (!val) return;
-
-      let matchedBot = null;
-      const allBots = [];
-      (TENANTS_DATA.tenants || []).forEach(t => {{
-        (t.bots || []).forEach(b => allBots.push(b));
-      }});
-
-      for (const b of allBots) {{
-        const c = b.routing_code.toLowerCase();
-        const aliases = (b.aliases || []).map(a => a.toLowerCase());
-        const low = val.toLowerCase();
-        if (low.startsWith(c) || aliases.some(a => low.startsWith(a))) {{
-          matchedBot = b;
-          break;
-        }}
-      }}
-
-      resEl.classList.remove('hidden');
-      if (matchedBot) {{
-        resEl.innerHTML = `
-          <span class="text-emerald-700 font-bold">✅ PHÂN LUỒNG THÀNH CÔNG:</span><br>
-          • <strong>Bot đích:</strong> ${{matchedBot.name}} (${{matchedBot.routing_code}})<br>
-          • <strong>Chế độ:</strong> ${{matchedBot.mode === 'video' ? '🎬 Render Video' : '💬 Chat Nghiệp Vụ'}}<br>
-          • <strong>Tài khoản AI:</strong> ${{matchedBot.linked_pool_account || 'studio-pool'}}<br>
-          • <strong>Kịch bản Persona:</strong> <em>"${{matchedBot.persona}}"</em>
-        `;
-      }} else {{
-        resEl.innerHTML = `
-          <span class="text-amber-700 font-bold">⚠️ KHÔNG KHỚP MÃ RIÊNG:</span><br>
-          Tin nhắn sẽ được chuyển về <strong>Trợ Lý Tổng Mặc Định</strong> hoặc gửi hướng dẫn danh sách mã bot cho người dùng.
-        `;
-      }}
-    }}
-
-    // Change Active Assistant
-    function changeActiveAssistant(botId) {{
-      ACTIVE_ASSISTANT_ID = botId;
-      saveFleetToStorage();
-      renderAssistantsFleet();
-      const bot = ASSISTANTS_FLEET.find(a => a.id === botId);
-      if (bot) alert(`✅ Đã chọn Trợ Lý Điều Hành: "${{bot.name}}"`);
-    }}
-
-    // Render Assistants Fleet Cards & Dropdowns
-    function renderAssistantsFleet() {{
-      const container = document.getElementById('fleet-cards-container');
-      const topSelect = document.getElementById('assistant-top-selector');
-      const kpiTotal = document.getElementById('fleet-total-count');
-      const kpiOnline = document.getElementById('fleet-online-count');
-      const kpiMsg = document.getElementById('fleet-messages-count');
-      const kpiOverview = document.getElementById('kpi-overview-assistants');
-
-      if (kpiTotal) kpiTotal.innerText = `${{ASSISTANTS_FLEET.length}} Trợ Lý`;
-      if (kpiOverview) kpiOverview.innerText = `${{ASSISTANTS_FLEET.length}} Bot • ${{POOL_ACCOUNTS.length}} Cookie`;
-
-      const onlineBots = ASSISTANTS_FLEET.filter(a => a.status === 'online').length;
-      if (kpiOnline) kpiOnline.innerText = `${{onlineBots}} Online`;
-
-      const totalMsgs = ASSISTANTS_FLEET.reduce((acc, a) => acc + (a.messages_count || 0), 0);
-      if (kpiMsg) kpiMsg.innerText = totalMsgs.toLocaleString('vi-VN') + " Tin";
-
-      // Top select dropdown
-      if (topSelect) {{
-        topSelect.innerHTML = ASSISTANTS_FLEET.map(a => `
-          <option value="${{a.id}}" ${{a.id === ACTIVE_ASSISTANT_ID ? 'selected' : ''}}>
-            ${{a.name}} (${{a.platform}})
-          </option>
-        `).join('');
-      }}
-
-      // Fleet cards
-      if (container) {{
-        container.innerHTML = ASSISTANTS_FLEET.map(bot => {{
-          const isActive = (bot.id === ACTIVE_ASSISTANT_ID);
-          const isOnline = (bot.status === 'online');
-          const groupCount = bot.assigned_groups ? bot.assigned_groups.length : 0;
-
-          return `
-            <div class="bg-white p-5 rounded-2xl border ${{isActive ? 'border-indigo-500 shadow-md ring-2 ring-indigo-500/10' : 'border-slate-200'}} shadow-sm space-y-4">
-              <div class="flex items-start justify-between">
-                <div class="flex items-center space-x-3.5">
-                  <div class="relative w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
-                    <img src="${{bot.avatar}}" alt="${{bot.name}}" class="w-full h-full object-cover">
-                    <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${{isOnline ? 'bg-emerald-500' : 'bg-slate-400'}}"></span>
-                  </div>
-                  <div>
-                    <div class="flex items-center space-x-2">
-                      <h4 class="font-extrabold text-sm text-slate-900">${{bot.name}}</h4>
-                      ${{isActive ? '<span class="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-indigo-600 text-white uppercase">Chính</span>' : ''}}
-                    </div>
-                    <p class="text-[11px] text-slate-500 mt-0.5 font-medium">${{bot.role}}</p>
-                    <div class="flex items-center space-x-2 text-[10px] text-slate-400 font-mono mt-0.5">
-                      <span>Cổng: <strong class="text-indigo-600 font-bold">${{bot.bridge_port}}</strong></span>
-                      <span>•</span>
-                      <span>UID: ${{bot.uid}}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="flex items-center space-x-1.5">
-                  <button onclick="toggleBotStatus('${{bot.id}}')" class="p-1.5 rounded-lg border text-xs font-bold ${{isOnline ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}} transition-all" title="Bật/Tắt Trợ Lý">
-                    ${{isOnline ? '🟢 Hoạt Động' : '⚪ Tạm Dừng'}}
-                  </button>
-                  ${{!isActive ? `
-                    <button onclick="deleteAssistant('${{bot.id}}')" class="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all" title="Gỡ bỏ">
-                      <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>
-                  ` : ''}}
-                </div>
-              </div>
-
-              <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 italic">
-                "${{bot.persona}}"
-              </p>
-
-              <div class="flex flex-wrap items-center justify-between gap-2 text-xs border-t border-slate-100 pt-3">
-                <div class="flex items-center space-x-2 text-slate-500 font-medium">
-                  <i data-lucide="users" class="w-3.5 h-3.5 text-indigo-600"></i>
-                  <span>Phụ trách: <strong>${{groupCount}} nhóm Zalo</strong></span>
-                </div>
-                <div class="flex items-center space-x-3 text-[11px] font-mono text-slate-400">
-                  <span>RAM: <strong>${{bot.memory_mb || 45}} MB</strong></span>
-                  <span>Tin: <strong>${{(bot.messages_count || 0).toLocaleString()}}</strong></span>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-2 pt-1">
-                <button onclick="openQRPairModal('${{bot.id}}')" class="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 transition-all">
-                  <i data-lucide="qr-code" class="w-3.5 h-3.5 text-indigo-600"></i>
-                  <span>Nạp Phiên QR</span>
-                </button>
-                <button onclick="changeActiveAssistant('${{bot.id}}')" class="w-full py-1.5 ${{isActive ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}} rounded-xl text-xs font-bold transition-all">
-                  ${{isActive ? '✓ Đang Điều Hành' : 'Chọn Làm Trợ Lý Chính'}}
-                </button>
-              </div>
-            </div>
-          `;
-        }}).join('');
-      }}
-      lucide.createIcons();
-    }}
+    
 
     // Render Pool Accounts Table (Cổng 8770)
         function renderPoolAccounts() {{
