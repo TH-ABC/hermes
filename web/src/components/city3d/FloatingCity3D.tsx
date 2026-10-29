@@ -182,7 +182,7 @@ export const FloatingCity3D: React.FC<FloatingCity3DProps> = ({
 
     // 9. Animation Loop
     let animId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
