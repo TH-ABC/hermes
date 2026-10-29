@@ -634,8 +634,8 @@ def build_app():
                   <tr>
                     <th class="py-3 px-4">Tên Tài Khoản</th>
                     <th class="py-3 px-4 text-center">Trạng Thái Cookie</th>
-                    <th class="py-3 px-4">⚡ Token Còn Lại (Đo Lường)</th>
-                    <th class="py-3 px-4 text-center">⏱️ Reset Token</th>
+                    <th class="py-3 px-4">⚡ Mức Sử Dụng & Token</th>
+                    <th class="py-3 px-4 text-center">⏱️ Chu Kỳ Đặt Lại (Tuần)</th>
                     <th class="py-3 px-4 text-center">Khả Năng Đồ Họa</th>
                     <th class="py-3 px-4 text-center">Tác Phẩm</th>
                     <th class="py-3 px-4 text-right">Thao Tác</th>
@@ -1864,13 +1864,16 @@ def build_app():
         const isReady = (acc.status === 'ready');
         const isVideoOk = (acc.video_state === 'ok');
 
-        // Token metrics
+        // Token metrics (Chu kỳ đặt lại hàng tuần theo Meta AI Engine)
         const tokensTot = acc.tokens_total || 500;
         const tokensUsed = (acc.tokens_used !== undefined) ? acc.tokens_used : ((acc.done || 0) * 10);
         const tokensRem = (acc.tokens_remaining !== undefined) ? acc.tokens_remaining : Math.max(0, tokensTot - tokensUsed);
-        const pct = (acc.token_percent !== undefined) ? acc.token_percent : Math.round((tokensRem / tokensTot) * 100);
-        const resetStr = acc.reset_time_str || 'Reset sau 17h';
-        const resetSec = acc.reset_countdown_seconds || 61200;
+        const usedPct = (acc.used_percent !== undefined) ? acc.used_percent : Math.min(100, Math.round((tokensUsed / tokensTot) * 100));
+        const remPct = 100 - usedPct;
+        const resetStr = acc.reset_time_str || 'Còn 6 ngày 9h';
+        const resetLabel = acc.reset_label || 'Đặt lại vào 5 tháng 11';
+        const resetSec = acc.reset_countdown_seconds || 550000;
+        const bonusTokens = acc.bonus_tokens || '1 Tỷ Token (Vĩnh viễn)';
 
         return `
           <tr class="hover:bg-amber-50/30 transition-all border-b border-slate-100">
@@ -1891,24 +1894,27 @@ def build_app():
               </span>
             </td>
             <td class="py-3.5 px-4">
-              <div class="space-y-1 min-w-[130px]">
+              <div class="space-y-1.5 min-w-[155px]">
                 <div class="flex items-center justify-between text-[11px]">
-                  <span class="font-black text-slate-800">${{tokensRem.toLocaleString()}} / ${{tokensTot.toLocaleString()}}</span>
-                  <span class="font-extrabold ${{pct > 50 ? 'text-emerald-600' : pct > 20 ? 'text-amber-600' : 'text-rose-600'}}">${{pct}}%</span>
+                  <span class="font-bold text-slate-700">Gói miễn phí:</span>
+                  <span class="font-black ${{usedPct === 0 ? 'text-emerald-600' : usedPct < 50 ? 'text-blue-600' : 'text-amber-600'}}">Đã dùng ${{usedPct}}%</span>
                 </div>
                 <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                  <div class="h-full rounded-full transition-all ${{pct > 50 ? 'bg-emerald-500' : pct > 20 ? 'bg-amber-500' : 'bg-rose-500'}}" style="width: ${{pct}}%"></div>
+                  <div class="h-full rounded-full transition-all ${{usedPct < 50 ? 'bg-emerald-500' : usedPct < 80 ? 'bg-amber-500' : 'bg-rose-500'}}" style="width: ${{Math.max(4, usedPct)}}%"></div>
                 </div>
-                <span class="text-[10px] text-slate-400 block">Đã dùng: ${{tokensUsed}} Tokens</span>
+                <div class="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                  <span>Token bổ sung:</span>
+                  <span class="font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">còn 1 tỷ token</span>
+                </div>
               </div>
             </td>
             <td class="py-3.5 px-4 text-center">
               <div class="inline-flex flex-col items-center">
-                <span class="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-mono font-bold flex items-center space-x-1">
-                  <i data-lucide="clock" class="w-3 h-3 text-indigo-600"></i>
+                <span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-mono font-bold flex items-center space-x-1 shadow-sm">
+                  <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-indigo-600"></i>
                   <span class="pool-countdown-timer" data-reset="${{resetSec}}">${{resetStr}}</span>
                 </span>
-                <span class="text-[9px] text-slate-400 mt-0.5">Reset: 07:00 hàng ngày</span>
+                <span class="text-[9px] text-slate-500 mt-1 font-semibold">${{resetLabel}}</span>
               </div>
             </td>
             <td class="py-3.5 px-4 text-center">
@@ -2633,7 +2639,7 @@ def build_app():
       }}
     }}
 
-    function startLocalLogin() {{
+    async function startLocalLogin() {{
       const raw = document.getElementById('autoAccInput').value.trim();
       if (!raw) return alert('Vui lòng nhập ít nhất 1 tài khoản (email|password) để mở Chrome local!');
 
@@ -2647,11 +2653,16 @@ def build_app():
 
       const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
       const localUrl = 'http://127.0.0.1:8771/#' + b64;
-      window.open(localUrl, '_blank');
-      alert('🖥️ Đã mở cửa sổ Đăng Nhập Local (Port 8771)! Vui lòng thao tác giải captcha trên màn hình Sever để cookie tự nạp vào Pool.');
+
+      try {{
+        await fetch('http://127.0.0.1:8771', {{ method: 'GET', mode: 'no-cors', signal: AbortSignal.timeout(1200) }});
+        window.open(localUrl, '_blank');
+      }} catch (err) {{
+        alert('⚠️ Chú ý: Sếp đang mở Dashboard từ máy tính cá nhân/thiết bị khác (không phải máy Sever Hermes).\\n\\nCổng 8771 (mở trình duyệt Chrome thật để giải captcha) đang chạy trực tiếp trên máy Sever Hermes. Để giải captcha bằng tay, Sếp hãy mở Dashboard hoặc UltraViewer trực tiếp trên máy Sever Hermes nhé!\\n\\nNếu ngồi ở máy này, Sếp hãy dùng nút [⚡ Bắt Đầu Đăng Nhập & Nạp Vào Pool] để hệ thống tự động xử lý lấy OTP từ xa!');
+      }}
     }}
 
-    function launchLocalLoginForAccount(accName) {{
+    async function launchLocalLoginForAccount(accName) {{
       const raw = `${{accName}}|`;
       const cfg = {{
         accounts_raw: raw,
@@ -2660,7 +2671,13 @@ def build_app():
         skip: []
       }};
       const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
-      window.open('http://127.0.0.1:8771/#' + b64, '_blank');
+      const localUrl = 'http://127.0.0.1:8771/#' + b64;
+      try {{
+        await fetch('http://127.0.0.1:8771', {{ method: 'GET', mode: 'no-cors', signal: AbortSignal.timeout(1200) }});
+        window.open(localUrl, '_blank');
+      }} catch (err) {{
+        alert('⚠️ Cổng 8771 mở trình duyệt Chrome thật đang chạy trên máy chủ Sever Hermes.\\nVui lòng mở UltraViewer hoặc thao tác trực tiếp trên máy Sever để nhìn thấy cửa sổ Chrome giải captcha cho tài khoản ' + accName + ' nhé Sếp!');
+      }}
     }}
 
     // Lắng nghe postMessage từ cửa sổ local login port 8771
@@ -2681,18 +2698,19 @@ def build_app():
       }}
     }});
 
-    // Countdown Ticker mỗi 60 giây
+    // Countdown Ticker mỗi 60 giây (Chu kỳ đặt lại hàng tuần)
     setInterval(() => {{
       document.querySelectorAll('.pool-countdown-timer').forEach(el => {{
         let sec = parseInt(el.getAttribute('data-reset') || '0', 10);
         if (sec > 60) {{
           sec -= 60;
           el.setAttribute('data-reset', sec);
-          const h = Math.floor(sec / 3600);
+          const d = Math.floor(sec / 86400);
+          const h = Math.floor((sec % 86400) / 3600);
           const m = Math.floor((sec % 3600) / 60);
-          el.textContent = `Reset sau ${{h}}h ${{m}}m`;
+          el.textContent = d > 0 ? `Còn ${{d}} ngày ${{h}}h` : `Còn ${{h}}h ${{m}}m`;
         }} else {{
-          el.textContent = 'Đang reset...';
+          el.textContent = 'Đang đặt lại...';
         }}
       }});
     }}, 60000);

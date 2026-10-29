@@ -308,24 +308,31 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
                 with urllib.request.urlopen("http://127.0.0.1:8770/v1/accounts", timeout=5) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                     now = datetime.now()
-                    target_reset = now.replace(hour=7, minute=0, second=0, microsecond=0)
-                    if now >= target_reset:
-                        target_reset += timedelta(days=1)
+                    base_reset = datetime(2026, 11, 5, 0, 0, 0)
+                    target_reset = base_reset
+                    while now >= target_reset:
+                        target_reset += timedelta(days=7)
                     diff_s = int((target_reset - now).total_seconds())
-                    hours = diff_s // 3600
+                    days = diff_s // 86400
+                    hours = (diff_s % 86400) // 3600
                     mins = (diff_s % 3600) // 60
-                    reset_time_str = f"Reset sau {hours}h {mins}m"
+                    reset_time_str = f"Còn {days} ngày {hours}h" if days > 0 else f"Còn {hours}h {mins}m"
+                    reset_label = f"Đặt lại vào {target_reset.day} tháng {target_reset.month}"
 
                     for acc in data.get("accounts", []):
                         done = acc.get("done", 0)
                         tot = 500
                         used = done * 10
                         rem = max(0, tot - used)
+                        used_pct = min(100, int((used / tot) * 100)) if tot > 0 else 0
                         acc["tokens_total"] = tot
                         acc["tokens_used"] = used
                         acc["tokens_remaining"] = rem
-                        acc["token_percent"] = int((rem / tot) * 100) if tot > 0 else 0
+                        acc["token_percent"] = 100 - used_pct
+                        acc["used_percent"] = used_pct
+                        acc["bonus_tokens"] = "1 Tỷ Token (Vĩnh viễn)"
                         acc["reset_time_str"] = reset_time_str
+                        acc["reset_label"] = reset_label
                         acc["reset_countdown_seconds"] = diff_s
                     self._send_json(data)
                     return

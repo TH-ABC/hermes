@@ -69,21 +69,25 @@ def sync_pool_accounts() -> bool:
         done = acc.get("done", 0)
         failed = acc.get("failed", 0)
 
-        # Tính toán Token & Quota thời gian thực
-        tokens_total = 500  # 500 Credits/Tokens tiêu chuẩn cho tài khoản AI Studio
+        # Tính toán Token & Quota thời gian thực theo Chu Kỳ Tuần (Weekly Reset)
+        from datetime import timedelta
+        now = datetime.now()
+        base_reset = datetime(2026, 11, 5, 0, 0, 0)
+        target_reset = base_reset
+        while now >= target_reset:
+            target_reset += timedelta(days=7)
+        diff_s = int((target_reset - now).total_seconds())
+        days = diff_s // 86400
+        hours = (diff_s % 86400) // 3600
+        mins = (diff_s % 3600) // 60
+        reset_time_str = f"Còn {days} ngày {hours}h" if days > 0 else f"Còn {hours}h {mins}m"
+        reset_label = f"Đặt lại vào {target_reset.day} tháng {target_reset.month}"
+
+        tokens_total = 500  # Hạn ngạch inference tuần quy đổi (Gói miễn phí)
         tokens_used = done * 10
         tokens_remaining = max(0, tokens_total - tokens_used)
-        token_percent = int((tokens_remaining / tokens_total) * 100) if tokens_total > 0 else 0
-
-        now = datetime.now()
-        target_reset = now.replace(hour=7, minute=0, second=0, microsecond=0)
-        if now >= target_reset:
-            from datetime import timedelta
-            target_reset += timedelta(days=1)
-        diff_s = int((target_reset - now).total_seconds())
-        hours = diff_s // 3600
-        mins = (diff_s % 3600) // 60
-        reset_time_str = f"Reset sau {hours}h {mins}m"
+        used_percent = min(100, int((tokens_used / tokens_total) * 100)) if tokens_total > 0 else 0
+        token_percent = 100 - used_percent
 
         prev = existing_list.get(name)
         acc_dict = {
@@ -98,7 +102,10 @@ def sync_pool_accounts() -> bool:
             "tokens_used": tokens_used,
             "tokens_remaining": tokens_remaining,
             "token_percent": token_percent,
+            "used_percent": used_percent,
+            "bonus_tokens": "1 Tỷ Token (Vĩnh viễn)",
             "reset_time_str": reset_time_str,
+            "reset_label": reset_label,
             "reset_countdown_seconds": diff_s,
             "expires_in": "Còn hạn (Live)" if status == "ready" else "Đã hết hạn",
             "video_state": video_state,
