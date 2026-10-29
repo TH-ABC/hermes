@@ -57,7 +57,13 @@ async def handle_confirm(request):
     data = await request.json()
     fut = HOLD["fut"]
     if fut and not fut.done():
-        fut.set_result("ok" if data.get("result") == "ok" else "blocked")
+        res = data.get("result")
+        if res == "skip":
+            fut.set_result("skip")
+        elif res == "ok":
+            fut.set_result("ok")
+        else:
+            fut.set_result("blocked")
     return web.json_response({"ok": True}, headers=CORS)
 
 
@@ -163,6 +169,7 @@ async def handle_login(request: web.Request) -> web.StreamResponse:
                 await push(f"❌ Thất bại {label}: {res.get('error')}", "ERROR", prog)
                 continue
             if verdict["v"] == "skip":
+                await push(f"⏭ Đã từ chối/bỏ qua {label} theo yêu cầu — không nạp vào Pool", "SKIP", prog)
                 continue
             video_state = verdict["v"]  # "ok" | "blocked" (blocked = image-only account, still goes into the pool)
             await push(f"🎬 {label}: tạo video OK" if video_state == "ok"
@@ -202,7 +209,8 @@ pre{background:#000;padding:12px;border-radius:8px;height:70vh;overflow:auto;whi
 <textarea id=rjson readonly rows=3 style="width:100%;margin:8px 0;background:#000;color:#9c9;border:1px solid #333;font:11px monospace"></textarea>
 <button id=cjson>📋 Copy cookie JSON</button>
 <button id=vok style="background:#2a7;color:#fff">✅ Tạo được video — nạp Pool</button>
-<button id=vfail style="background:#a52;color:#fff">🖼️ Không tạo được video — nạp Pool (chỉ tạo ảnh)</button></div>
+<button id=vfail style="background:#a52;color:#fff">🖼️ Không tạo được video — nạp Pool (chỉ tạo ảnh)</button>
+<button id=vskip style="background:#dc2626;color:#fff">❌ Từ chối / Bỏ qua (Không nạp)</button></div>
 <div id=bar><i></i></div><pre id=log></pre>
 <script>
 (async()=>{
@@ -212,7 +220,7 @@ history.replaceState(null,"",location.pathname);
 if(!cfg){$("#st").textContent="Mở trang này từ nút 'Đăng nhập local' trên dashboard.";return}
 $("#stop").onclick=async()=>{await fetch("/stop",{method:"POST"});$("#st").textContent="Đã dừng";add("⏹ Đã bấm Dừng — đóng Chrome và bỏ qua phần còn lại")};
 const ans=async r=>{$("#ready").style.display="none";await fetch("/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({result:r})})};
-$("#vok").onclick=()=>ans("ok");$("#vfail").onclick=()=>ans("fail");
+$("#vok").onclick=()=>ans("ok");$("#vfail").onclick=()=>ans("fail");$("#vskip").onclick=()=>ans("skip");
 $("#cjson").onclick=()=>{$("#rjson").select();navigator.clipboard&&navigator.clipboard.writeText($("#rjson").value)};
 const add=m=>{log.textContent+="["+new Date().toLocaleTimeString("vi-VN")+"] "+m+"\n";log.scrollTop=log.scrollHeight};
 window.addEventListener("message",e=>{if(e.data&&e.data.museAck)add((e.data.ok?"✅ Đã nạp "+e.data.name+" vào Pool":"❌ Không nạp được "+e.data.name+": "+e.data.error))});

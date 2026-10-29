@@ -69,11 +69,31 @@ def sync_pool_accounts() -> bool:
         done = acc.get("done", 0)
         failed = acc.get("failed", 0)
 
-        # Tính toán Token & Quota thời gian thực theo Chu Kỳ Tuần (Weekly Reset)
+        # Tính toán Token & Quota thời gian thực theo Chu Kỳ Tuần Từng Tài Khoản
         from datetime import timedelta
         now = datetime.now()
-        base_reset = datetime(2026, 11, 5, 0, 0, 0)
-        target_reset = base_reset
+        resets_file = ROOT_DIR / "museai" / "scratch" / "account_resets.json"
+        custom_resets = {}
+        if resets_file.exists():
+            try:
+                with open(resets_file, "r", encoding="utf-8") as rf:
+                    custom_resets = json.load(rf)
+            except Exception:
+                pass
+
+        if name in custom_resets:
+            try:
+                target_reset = datetime.fromisoformat(custom_resets[name])
+            except Exception:
+                target_reset = now + timedelta(days=7)
+        else:
+            cookie_file = ROOT_DIR / "museai" / "cookies" / f"{name}.json"
+            if cookie_file.exists():
+                mtime = datetime.fromtimestamp(os.path.getmtime(cookie_file))
+                target_reset = mtime.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=7)
+            else:
+                target_reset = datetime(2026, 11, 5, 0, 0, 0)
+
         while now >= target_reset:
             target_reset += timedelta(days=7)
         diff_s = int((target_reset - now).total_seconds())

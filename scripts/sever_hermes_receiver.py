@@ -308,18 +308,39 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
                 with urllib.request.urlopen("http://127.0.0.1:8770/v1/accounts", timeout=5) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                     now = datetime.now()
-                    base_reset = datetime(2026, 11, 5, 0, 0, 0)
-                    target_reset = base_reset
-                    while now >= target_reset:
-                        target_reset += timedelta(days=7)
-                    diff_s = int((target_reset - now).total_seconds())
-                    days = diff_s // 86400
-                    hours = (diff_s % 86400) // 3600
-                    mins = (diff_s % 3600) // 60
-                    reset_time_str = f"Còn {days} ngày {hours}h" if days > 0 else f"Còn {hours}h {mins}m"
-                    reset_label = f"Đặt lại vào {target_reset.day} tháng {target_reset.month}"
+                    resets_file = ROOT_DIR / "museai" / "scratch" / "account_resets.json"
+                    custom_resets = {}
+                    if resets_file.exists():
+                        try:
+                            with open(resets_file, "r", encoding="utf-8") as rf:
+                                custom_resets = json.load(rf)
+                        except Exception:
+                            pass
 
                     for acc in data.get("accounts", []):
+                        aname = acc.get("name", "")
+                        if aname in custom_resets:
+                            try:
+                                target_reset = datetime.fromisoformat(custom_resets[aname])
+                            except Exception:
+                                target_reset = now + timedelta(days=7)
+                        else:
+                            cookie_file = ROOT_DIR / "museai" / "cookies" / f"{aname}.json"
+                            if cookie_file.exists():
+                                mtime = datetime.fromtimestamp(os.path.getmtime(cookie_file))
+                                target_reset = mtime.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=7)
+                            else:
+                                target_reset = datetime(2026, 11, 5, 0, 0, 0)
+
+                        while now >= target_reset:
+                            target_reset += timedelta(days=7)
+                        diff_s = int((target_reset - now).total_seconds())
+                        days = diff_s // 86400
+                        hours = (diff_s % 86400) // 3600
+                        mins = (diff_s % 3600) // 60
+                        reset_time_str = f"Còn {days} ngày {hours}h" if days > 0 else f"Còn {hours}h {mins}m"
+                        reset_label = f"Đặt lại vào {target_reset.day} tháng {target_reset.month}"
+
                         done = acc.get("done", 0)
                         tot = 500
                         used = done * 10
@@ -508,8 +529,18 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
             try:
                 import urllib.request
                 req = urllib.request.Request("http://127.0.0.1:8770/v1/accounts/auto-extract", data=raw_body, headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=120) as resp:
-                    self._send_json(json.loads(resp.read().decode("utf-8")))
+                with urllib.request.urlopen(req, timeout=300) as resp:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    while True:
+                        chunk = resp.read(1024)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
                     return
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
