@@ -539,24 +539,77 @@ def build_app():
             </div>
           </div>
 
-          <!-- Quick Actions & Guide Box -->
-          <div class="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 p-5 rounded-2xl border border-amber-200 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div class="space-y-1">
-              <div class="flex items-center space-x-2">
-                <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-                <h4 class="font-black text-sm text-amber-900">Cách Lấy & Nạp Cookie Trợ Lý Nền Tảng Đồ Họa Vào Pool:</h4>
+          <!-- ==================== AUTO OTP & LOCAL CAPTCHA LOGIN PANEL ==================== -->
+          <div class="bg-white rounded-3xl border border-indigo-200/80 shadow-md shadow-indigo-100/50 p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-50 pb-4">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
+                  ⚡
+                </div>
+                <div>
+                  <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Tự Động Nạp Mail | Password & Đăng Nhập Local Giải Captcha</h3>
+                  <p class="text-xs text-slate-500 mt-0.5">Tự động lấy mã OTP Microsoft, hoặc mở Chrome thật trên màn hình Sever để Sếp tự giải captcha trực tiếp.</p>
+                </div>
               </div>
-              <p class="text-xs text-amber-800 leading-relaxed">
-                <strong>Bước 1:</strong> Đăng nhập tài khoản trên Chrome &rarr; 
-                <strong>Bước 2:</strong> Bấm icon tiện ích <strong>Cookie-Editor</strong> &rarr; bấm <strong>Export</strong> &rarr; chọn <strong>JSON</strong> &rarr; 
-                <strong>Bước 3:</strong> Bấm nút <strong>"Nạp Cookie Mới"</strong> bên cạnh để dán vào. Hệ thống sẽ tự động trích xuất khóa phiên <code class="bg-white px-1 py-0.5 rounded text-amber-900 font-mono">hatch_sess</code> và kích hoạt ngay lập tức!
-              </p>
+              <div class="flex items-center space-x-2">
+                <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase">Auto OTP & Local Solve</span>
+              </div>
             </div>
-            <div class="flex items-center space-x-2 flex-shrink-0">
-              <button onclick="openImportCookieModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-amber-600/20">
-                <i data-lucide="cookie" class="w-4 h-4"></i>
-                <span>Nạp Cookie Ngay</span>
-              </button>
+
+            <div class="space-y-3">
+              <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+                <span>Danh Sách Tài Khoản (mỗi dòng 1 tài khoản: <code class="font-mono text-indigo-600 font-semibold">email|password</code> hoặc <code class="font-mono text-indigo-600 font-semibold">email|pass|refreshToken</code>)</span>
+                <span id="autoAccCount" class="text-slate-400 font-mono text-[11px]">0 tài khoản</span>
+              </div>
+              <textarea id="autoAccInput" rows="3" oninput="updateAutoAccCount()" placeholder="user1@hotmail.com|password123&#10;user2@hotmail.com|password456|refreshToken|client_id" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"></textarea>
+
+              <div class="flex flex-col sm:flex-row items-center gap-2">
+                <input type="text" id="sheetUrl" placeholder="Hoặc dán link Google Sheet (cột: email | password | refreshToken | client_id)" class="flex-1 w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none font-medium">
+                <button onclick="loadFromGoogleSheet()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
+                  <i data-lucide="sheet" class="w-4 h-4 text-emerald-600"></i>
+                  <span>Tải Từ Sheet</span>
+                </button>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <div class="flex flex-wrap items-center gap-4 text-xs">
+                  <label class="flex items-center space-x-2 cursor-pointer text-slate-600 font-semibold">
+                    <input type="checkbox" id="autoAccSkip" checked class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                    <span>Bỏ qua tài khoản đang hoạt động (chỉ chạy lại khi expired)</span>
+                  </label>
+                  <label class="flex items-center space-x-2 cursor-pointer text-slate-600 font-semibold">
+                    <input type="checkbox" id="autoAccOverwrite" checked class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                    <span>Ghi đè tài khoản đã có (để cập nhật lại cookie mới nếu hết hạn)</span>
+                  </label>
+                </div>
+
+                <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                  <button onclick="startAutoExtract()" id="btnStartAutoAcc" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-indigo-600/20 transition-all cursor-pointer">
+                    <i data-lucide="zap" class="w-4 h-4 text-amber-300"></i>
+                    <span>⚡ Bắt Đầu Đăng Nhập & Nạp Vào Pool</span>
+                  </button>
+                  <button onclick="startLocalLogin()" id="btnStartLocalAcc" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-md shadow-purple-600/20 transition-all cursor-pointer" title="Mở Chrome trên máy Sever để tự giải captcha">
+                    <i data-lucide="monitor" class="w-4 h-4"></i>
+                    <span>🖥️ Đăng Nhập Local (Tự Giải Captcha)</span>
+                  </button>
+                  <button onclick="openImportCookieModal()" class="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-sm transition-all cursor-pointer" title="Dán cookie JSON trực tiếp">
+                    <i data-lucide="cookie" class="w-4 h-4"></i>
+                    <span>+ Nạp Cookie</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Progress & Logs Box -->
+              <div id="autoAccProgress" class="hidden pt-3 border-t border-slate-100 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <span id="autoAccStatus" class="font-bold text-indigo-600">Đang chuẩn bị...</span>
+                  <span id="autoAccRatio" class="font-mono text-slate-400 font-bold">0/0</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                  <div id="autoAccBar" class="bg-indigo-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <pre id="autoAccLogs" class="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-[11px] max-h-36 overflow-y-auto leading-relaxed border border-slate-800"></pre>
+              </div>
             </div>
           </div>
 
@@ -581,10 +634,10 @@ def build_app():
                   <tr>
                     <th class="py-3 px-4">Tên Tài Khoản</th>
                     <th class="py-3 px-4 text-center">Trạng Thái Cookie</th>
+                    <th class="py-3 px-4">⚡ Token Còn Lại (Đo Lường)</th>
+                    <th class="py-3 px-4 text-center">⏱️ Reset Token</th>
                     <th class="py-3 px-4 text-center">Khả Năng Đồ Họa</th>
-                    <th class="py-3 px-4">Phiên Session (hatch_sess)</th>
-                    <th class="py-3 px-4 text-center">Tác Phẩm Hoàn Thành</th>
-                    <th class="py-3 px-4 text-center">Thời Hạn Cookie</th>
+                    <th class="py-3 px-4 text-center">Tác Phẩm</th>
                     <th class="py-3 px-4 text-right">Thao Tác</th>
                   </tr>
                 </thead>
@@ -1789,7 +1842,7 @@ def build_app():
     }}
 
     // Render Pool Accounts Table (Cổng 8770)
-    function renderPoolAccounts() {{
+        function renderPoolAccounts() {{
       const tbody = document.getElementById('pool-table-body');
       const badgeCount = document.getElementById('badge-pool-count');
       const kpiTotal = document.getElementById('pool-kpi-total');
@@ -1811,49 +1864,76 @@ def build_app():
         const isReady = (acc.status === 'ready');
         const isVideoOk = (acc.video_state === 'ok');
 
+        // Token metrics
+        const tokensTot = acc.tokens_total || 500;
+        const tokensUsed = (acc.tokens_used !== undefined) ? acc.tokens_used : ((acc.done || 0) * 10);
+        const tokensRem = (acc.tokens_remaining !== undefined) ? acc.tokens_remaining : Math.max(0, tokensTot - tokensUsed);
+        const pct = (acc.token_percent !== undefined) ? acc.token_percent : Math.round((tokensRem / tokensTot) * 100);
+        const resetStr = acc.reset_time_str || 'Reset sau 17h';
+        const resetSec = acc.reset_countdown_seconds || 61200;
+
         return `
-          <tr class="hover:bg-amber-50/30 transition-all">
+          <tr class="hover:bg-amber-50/30 transition-all border-b border-slate-100">
             <td class="py-3.5 px-4">
               <div class="flex items-center space-x-3">
                 <div class="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
                   <img src="${{acc.avatar}}" class="w-full h-full object-cover">
                 </div>
                 <div>
-                  <span class="font-bold text-slate-900 block font-mono">${{acc.name}}</span>
+                  <span class="font-bold text-slate-900 block font-mono text-xs">${{acc.name}}</span>
                   <span class="text-[10px] text-slate-400 font-mono">${{acc.file}}</span>
                 </div>
               </div>
             </td>
             <td class="py-3.5 px-4 text-center">
               <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase ${{isReady ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}}">
-                ${{isReady ? '🟢 Ready (Khỏe)' : '🔴 Expired (Hết hạn)'}}
+                ${{isReady ? '🟢 Ready' : '🔴 Expired'}}
               </span>
+            </td>
+            <td class="py-3.5 px-4">
+              <div class="space-y-1 min-w-[130px]">
+                <div class="flex items-center justify-between text-[11px]">
+                  <span class="font-black text-slate-800">${{tokensRem.toLocaleString()}} / ${{tokensTot.toLocaleString()}}</span>
+                  <span class="font-extrabold ${{pct > 50 ? 'text-emerald-600' : pct > 20 ? 'text-amber-600' : 'text-rose-600'}}">${{pct}}%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div class="h-full rounded-full transition-all ${{pct > 50 ? 'bg-emerald-500' : pct > 20 ? 'bg-amber-500' : 'bg-rose-500'}}" style="width: ${{pct}}%"></div>
+                </div>
+                <span class="text-[10px] text-slate-400 block">Đã dùng: ${{tokensUsed}} Tokens</span>
+              </div>
+            </td>
+            <td class="py-3.5 px-4 text-center">
+              <div class="inline-flex flex-col items-center">
+                <span class="px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-mono font-bold flex items-center space-x-1">
+                  <i data-lucide="clock" class="w-3 h-3 text-indigo-600"></i>
+                  <span class="pool-countdown-timer" data-reset="${{resetSec}}">${{resetStr}}</span>
+                </span>
+                <span class="text-[9px] text-slate-400 mt-0.5">Reset: 07:00 hàng ngày</span>
+              </div>
             </td>
             <td class="py-3.5 px-4 text-center">
               <div class="inline-flex items-center space-x-1.5">
                 <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${{isVideoOk ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}}">
-                  ${{isVideoOk ? '🎬 Tạo Video & Ảnh' : '🎨 Chỉ Tạo Ảnh'}}
+                  ${{isVideoOk ? '🎬 Video & Ảnh' : '🎨 Chỉ Tạo Ảnh'}}
                 </span>
                 <button onclick="toggleVideoMode('${{acc.name}}', '${{acc.video_state || 'blocked'}}')" title="Đổi chế độ tạo Video / Chỉ Ảnh" class="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 transition-all cursor-pointer">
                   <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
                 </button>
               </div>
             </td>
-            <td class="py-3.5 px-4 font-mono text-[11px] text-slate-500 truncate max-w-[200px]" title="${{acc.session_cookie}}">
-              ${{acc.session_cookie}}
-            </td>
-            <td class="py-3.5 px-4 text-center font-bold text-slate-700">
-              ${{acc.done || 0}} Tác phẩm
-            </td>
-            <td class="py-3.5 px-4 text-center text-xs">
-              <span class="${{isReady ? 'text-slate-600' : 'text-rose-600 font-bold'}}">${{acc.expires_in}}</span>
+            <td class="py-3.5 px-4 text-center font-bold text-slate-700 text-xs">
+              ${{acc.done || 0}} Đã xong
             </td>
             <td class="py-3.5 px-4 text-right">
               <div class="flex items-center justify-end space-x-1.5">
-                <button onclick="quickUpdateCookie('${{acc.name}}')" class="px-2.5 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 rounded-lg text-[11px] font-bold">
-                  🍪 Nạp Lại
+                <button onclick="launchLocalLoginForAccount('${{acc.name}}')" title="Mở Chrome local trên Sever để tự giải captcha tài khoản này" class="px-2 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 rounded-lg text-[10px] font-bold flex items-center space-x-1 cursor-pointer">
+                  <i data-lucide="monitor" class="w-3 h-3"></i>
+                  <span>Giải Captcha</span>
                 </button>
-                <button onclick="deletePoolAccount('${{acc.name}}')" class="p-1 text-slate-400 hover:text-rose-600 rounded">
+                <button onclick="quickUpdateCookie('${{acc.name}}')" class="px-2 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 rounded-lg text-[10px] font-bold cursor-pointer">
+                  🍪 Nạp Cookie
+                </button>
+                <button onclick="deletePoolAccount('${{acc.name}}')" class="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer">
                   <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>
               </div>
@@ -2472,6 +2552,150 @@ def build_app():
       }}
     }}
 
+
+
+    // ==================== AUTO OTP & LOCAL LOGIN ENGINE ====================
+    function updateAutoAccCount() {{
+      const val = document.getElementById('autoAccInput').value.trim();
+      const lines = val ? val.split('\\n').filter(l => l.trim() && !l.trim().startsWith('#')) : [];
+      document.getElementById('autoAccCount').innerText = `${{lines.length}} tài khoản`;
+    }}
+
+    async function loadFromGoogleSheet() {{
+      const url = document.getElementById('sheetUrl').value.trim();
+      if (!url) return alert('Vui lòng dán link Google Sheet!');
+      try {{
+        const resp = await fetch('/api/pool/sheet', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ url: url }})
+        }});
+        const resData = await resp.json();
+        if (resData.ok && resData.accounts_raw) {{
+          document.getElementById('autoAccInput').value = resData.accounts_raw;
+          updateAutoAccCount();
+          alert(`✅ Đã nạp thành công ${{resData.count || 0}} tài khoản từ Google Sheet!`);
+        }} else {{
+          alert('⚠️ Lỗi: ' + (resData.error || 'Không tải được Google Sheet.'));
+        }}
+      }} catch (e) {{
+        alert('⚠️ Lỗi kết nối Google Sheet: ' + e.message);
+      }}
+    }}
+
+    async function startAutoExtract() {{
+      const raw = document.getElementById('autoAccInput').value.trim();
+      if (!raw) return alert('Vui lòng nhập ít nhất 1 tài khoản (email|password)!');
+
+      const btn = document.getElementById('btnStartAutoAcc');
+      const prog = document.getElementById('autoAccProgress');
+      const bar = document.getElementById('autoAccBar');
+      const ratio = document.getElementById('autoAccRatio');
+      const statusTxt = document.getElementById('autoAccStatus');
+      const logs = document.getElementById('autoAccLogs');
+
+      prog.classList.remove('hidden');
+      btn.disabled = true;
+      btn.innerHTML = '<span>Đang chạy trích xuất...</span>';
+      statusTxt.innerText = 'Đang kết nối Server AI Studio...';
+      bar.style.width = '10%';
+      logs.textContent = '🚀 Bắt đầu tiến trình tự động nạp & giải OTP...\\n';
+
+      try {{
+        const resp = await fetch('/api/pool/auto-extract', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{
+            accounts_raw: raw,
+            skip_ready: document.getElementById('autoAccSkip').checked,
+            overwrite: document.getElementById('autoAccOverwrite').checked
+          }})
+        }});
+
+        const resData = await resp.json();
+        if (resData.ok) {{
+          bar.style.width = '100%';
+          statusTxt.innerText = '✅ Hoàn thành trích xuất!';
+          logs.textContent += '✅ ' + (resData.message || 'Đã nạp cookie thành công vào Pool!') + '\\n';
+          alert('✅ Đã nạp thành công tài khoản vào Pool AI!');
+          window.location.reload();
+        }} else {{
+          statusTxt.innerText = '⚠️ Lỗi: ' + (resData.error || 'Thất bại');
+          logs.textContent += '❌ Lỗi: ' + (resData.error || 'Không rõ lỗi') + '\\n';
+        }}
+      }} catch (err) {{
+        statusTxt.innerText = 'Lỗi kết nối';
+        logs.textContent += '❌ Lỗi mạng: ' + err.message + '\\n';
+      }} finally {{
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4 text-amber-300"></i><span>⚡ Bắt Đầu Đăng Nhập & Nạp Vào Pool</span>';
+        lucide.createIcons();
+      }}
+    }}
+
+    function startLocalLogin() {{
+      const raw = document.getElementById('autoAccInput').value.trim();
+      if (!raw) return alert('Vui lòng nhập ít nhất 1 tài khoản (email|password) để mở Chrome local!');
+
+      const skip = document.getElementById('autoAccSkip').checked ? (POOL_ACCOUNTS || []).filter(a => a.status === 'ready').map(a => a.name) : [];
+      const cfg = {{
+        accounts_raw: raw,
+        overwrite: document.getElementById('autoAccOverwrite').checked,
+        target: window.location.origin,
+        skip: skip
+      }};
+
+      const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
+      const localUrl = 'http://127.0.0.1:8771/#' + b64;
+      window.open(localUrl, '_blank');
+      alert('🖥️ Đã mở cửa sổ Đăng Nhập Local (Port 8771)! Vui lòng thao tác giải captcha trên màn hình Sever để cookie tự nạp vào Pool.');
+    }}
+
+    function launchLocalLoginForAccount(accName) {{
+      const raw = `${{accName}}|`;
+      const cfg = {{
+        accounts_raw: raw,
+        overwrite: true,
+        target: window.location.origin,
+        skip: []
+      }};
+      const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(cfg))));
+      window.open('http://127.0.0.1:8771/#' + b64, '_blank');
+    }}
+
+    // Lắng nghe postMessage từ cửa sổ local login port 8771
+    window.addEventListener('message', async (e) => {{
+      if (e.origin !== 'http://127.0.0.1:8771' || !e.data || !e.data.museLocal) return;
+      const {{ name, cookies, overwrite, video_state }} = e.data;
+      try {{
+        const resp = await fetch('/api/pool/add', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ name, cookies, overwrite, video_state }})
+        }});
+        const resData = await resp.json();
+        e.source.postMessage({{ museAck: 1, name, ok: !!resData.ok }}, e.origin);
+        renderPoolAccounts();
+      }} catch (err) {{
+        console.warn('Lỗi postMessage local login:', err);
+      }}
+    }});
+
+    // Countdown Ticker mỗi 60 giây
+    setInterval(() => {{
+      document.querySelectorAll('.pool-countdown-timer').forEach(el => {{
+        let sec = parseInt(el.getAttribute('data-reset') || '0', 10);
+        if (sec > 60) {{
+          sec -= 60;
+          el.setAttribute('data-reset', sec);
+          const h = Math.floor(sec / 3600);
+          const m = Math.floor((sec % 3600) / 60);
+          el.textContent = `Reset sau ${{h}}h ${{m}}m`;
+        }} else {{
+          el.textContent = 'Đang reset...';
+        }}
+      }});
+    }}, 60000);
 
     // Init
     window.addEventListener('DOMContentLoaded', () => {{

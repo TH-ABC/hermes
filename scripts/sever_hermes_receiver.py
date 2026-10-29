@@ -292,11 +292,41 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
             self._send_json(res)
             return
 
+        if self.path.startswith("/api/pool/local-login/status"):
+            import socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            is_running = (sock.connect_ex(('127.0.0.1', 8771)) == 0)
+            sock.close()
+            self._send_json({"ok": True, "local_login_running": is_running, "port": 8771, "url": "http://127.0.0.1:8771"})
+            return
+
         if self.path.startswith("/api/pool"):
             try:
                 import urllib.request
+                from datetime import datetime, timedelta
                 with urllib.request.urlopen("http://127.0.0.1:8770/v1/accounts", timeout=5) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
+                    now = datetime.now()
+                    target_reset = now.replace(hour=7, minute=0, second=0, microsecond=0)
+                    if now >= target_reset:
+                        target_reset += timedelta(days=1)
+                    diff_s = int((target_reset - now).total_seconds())
+                    hours = diff_s // 3600
+                    mins = (diff_s % 3600) // 60
+                    reset_time_str = f"Reset sau {hours}h {mins}m"
+
+                    for acc in data.get("accounts", []):
+                        done = acc.get("done", 0)
+                        tot = 500
+                        used = done * 10
+                        rem = max(0, tot - used)
+                        acc["tokens_total"] = tot
+                        acc["tokens_used"] = used
+                        acc["tokens_remaining"] = rem
+                        acc["token_percent"] = int((rem / tot) * 100) if tot > 0 else 0
+                        acc["reset_time_str"] = reset_time_str
+                        acc["reset_countdown_seconds"] = diff_s
                     self._send_json(data)
                     return
             except Exception as e:
@@ -461,6 +491,32 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
                 )
                 self._send_json(res)
                 return
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+                return
+
+        if self.path.startswith("/api/pool/auto-extract"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_length)
+            try:
+                import urllib.request
+                req = urllib.request.Request("http://127.0.0.1:8770/v1/accounts/auto-extract", data=raw_body, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    self._send_json(json.loads(resp.read().decode("utf-8")))
+                    return
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+                return
+
+        if self.path.startswith("/api/pool/sheet"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_length)
+            try:
+                import urllib.request
+                req = urllib.request.Request("http://127.0.0.1:8770/v1/accounts/sheet", data=raw_body, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    self._send_json(json.loads(resp.read().decode("utf-8")))
+                    return
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
                 return

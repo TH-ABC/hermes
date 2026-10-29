@@ -69,6 +69,22 @@ def sync_pool_accounts() -> bool:
         done = acc.get("done", 0)
         failed = acc.get("failed", 0)
 
+        # Tính toán Token & Quota thời gian thực
+        tokens_total = 500  # 500 Credits/Tokens tiêu chuẩn cho tài khoản AI Studio
+        tokens_used = done * 10
+        tokens_remaining = max(0, tokens_total - tokens_used)
+        token_percent = int((tokens_remaining / tokens_total) * 100) if tokens_total > 0 else 0
+
+        now = datetime.now()
+        target_reset = now.replace(hour=7, minute=0, second=0, microsecond=0)
+        if now >= target_reset:
+            from datetime import timedelta
+            target_reset += timedelta(days=1)
+        diff_s = int((target_reset - now).total_seconds())
+        hours = diff_s // 3600
+        mins = (diff_s % 3600) // 60
+        reset_time_str = f"Reset sau {hours}h {mins}m"
+
         prev = existing_list.get(name)
         acc_dict = {
             "name": name,
@@ -78,6 +94,12 @@ def sync_pool_accounts() -> bool:
             "has_hatch_sess": (status == "ready"),
             "done": done,
             "failed": failed,
+            "tokens_total": tokens_total,
+            "tokens_used": tokens_used,
+            "tokens_remaining": tokens_remaining,
+            "token_percent": token_percent,
+            "reset_time_str": reset_time_str,
+            "reset_countdown_seconds": diff_s,
             "expires_in": "Còn hạn (Live)" if status == "ready" else "Đã hết hạn",
             "video_state": video_state,
             "last_check": "Vừa kiểm tra",
