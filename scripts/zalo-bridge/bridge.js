@@ -142,10 +142,26 @@ function attachListener(apiInstance) {
   apiInstance.listener.on('closed', (code, reason) => {
     connectionState = 'disconnected';
     console.error(`Zalo listener: closed (code=${code} ${CloseReason[code] || ''}) ${reason || ''}`);
+    setTimeout(() => {
+      try {
+        console.log('[Bridge] Auto-reconnecting Zalo listener...');
+        apiInstance.listener.start();
+      } catch (e) {
+        console.error('[Bridge] Reconnect error:', e.message);
+      }
+    }, 3000);
   });
   apiInstance.listener.on('disconnected', (code, reason) => {
     connectionState = 'disconnected';
     console.error(`Zalo listener: disconnected (code=${code} ${CloseReason[code] || ''}) ${reason || ''}`);
+    setTimeout(() => {
+      try {
+        console.log('[Bridge] Auto-reconnecting Zalo listener...');
+        apiInstance.listener.start();
+      } catch (e) {
+        console.error('[Bridge] Reconnect error:', e.message);
+      }
+    }, 3000);
   });
   apiInstance.listener.on('error', (err) => {
     console.error(`Zalo listener: error ${err?.message || err}`);
@@ -301,7 +317,7 @@ app.get('/messages', (req, res) => {
 });
 
 app.get('/groups', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   try {
@@ -374,7 +390,7 @@ app.get('/groups', async (req, res) => {
 });
 
 app.get('/friends', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   try {
@@ -386,7 +402,7 @@ app.get('/friends', async (req, res) => {
 });
 
 app.post('/send', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   const { chat_id: chatId, text } = req.body || {};
@@ -410,7 +426,7 @@ app.post('/send', async (req, res) => {
 });
 
 app.post('/send-media', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   const { chat_id: chatId, file_path: filePath, caption } = req.body || {};
@@ -439,7 +455,7 @@ app.post('/send-media', async (req, res) => {
 });
 
 app.post('/send-link', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   const { chat_id: chatId, link, msg } = req.body || {};
@@ -465,7 +481,7 @@ app.post('/send-link', async (req, res) => {
 });
 
 app.post('/typing', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   const { chat_id: chatId } = req.body || {};
@@ -487,7 +503,7 @@ app.post('/typing', async (req, res) => {
 });
 
 app.post('/create-group', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   const { name, members } = req.body || {};
@@ -509,7 +525,7 @@ app.post('/create-group', async (req, res) => {
 });
 
 app.post('/add-group-members', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   const { group_id: groupId, members } = req.body || {};
@@ -541,7 +557,7 @@ app.post('/add-group-members', async (req, res) => {
 });
 
 app.get('/group-link', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   const groupId = req.query.group_id;
@@ -573,7 +589,7 @@ app.get('/group-link', async (req, res) => {
 });
 
 app.post('/invite-to-group', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   const { group_id: groupId, user_id: userId } = req.body || {};
@@ -600,7 +616,7 @@ app.post('/invite-to-group', async (req, res) => {
 });
 
 app.post('/leave-group', async (req, res) => {
-  if (!api || connectionState !== 'connected') {
+  if (!api) {
     return res.status(503).json({ error: 'Not connected to Zalo' });
   }
   const { group_id: groupId, silent } = req.body || {};
