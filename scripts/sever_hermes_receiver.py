@@ -467,13 +467,16 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
                     self._send_json({"ok": False, "error": "group_id is required"}, 400)
                     return
 
+                clean_gid = f"g:{gid}" if not gid.startswith("g:") else gid
+                raw_gid = gid.replace("g:", "")
+
                 # 1. Gọi lệnh /leave-group sang Zalo Bridge (Cổng 3050)
                 bridge_res = {}
                 try:
                     import urllib.request
                     b_req = urllib.request.Request(
                         "http://127.0.0.1:3050/leave-group",
-                        data=json.dumps({"group_id": gid, "silent": True}).encode("utf-8"),
+                        data=json.dumps({"group_id": clean_gid, "silent": False}).encode("utf-8"),
                         headers={"Content-Type": "application/json"}
                     )
                     with urllib.request.urlopen(b_req, timeout=10) as b_resp:
@@ -485,10 +488,8 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
                 p_file = Path("D:/hermes-main/storage/policy.json")
                 if p_file.exists():
                     p_data = json.loads(p_file.read_text(encoding="utf-8"))
-                    clean_gid = f"g:{gid}" if not gid.startswith("g:") else gid
-                    raw_num = gid.replace("g:", "")
                     p_data.get("groups", {}).pop(clean_gid, None)
-                    p_data.get("groups", {}).pop(raw_num, None)
+                    p_data.get("groups", {}).pop(raw_gid, None)
                     p_data["total_groups"] = len(p_data.get("groups", {}))
                     p_file.write_text(json.dumps(p_data, indent=2, ensure_ascii=False), encoding="utf-8")
 

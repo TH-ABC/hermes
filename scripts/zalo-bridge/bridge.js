@@ -516,9 +516,13 @@ app.post('/add-group-members', async (req, res) => {
   if (!groupId || !members || !Array.isArray(members)) {
     return res.status(400).json({ error: 'group_id and members are required' });
   }
+  let cleanId = String(groupId).trim();
+  if (!cleanId.startsWith('g:') && !cleanId.startsWith('u:')) {
+    cleanId = 'g:' + cleanId;
+  }
   let parsed;
   try {
-    parsed = parseChatId(groupId);
+    parsed = parseChatId(cleanId);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -544,9 +548,13 @@ app.get('/group-link', async (req, res) => {
   if (!groupId) {
     return res.status(400).json({ error: 'group_id query param is required' });
   }
+  let cleanId = String(groupId).trim();
+  if (!cleanId.startsWith('g:') && !cleanId.startsWith('u:')) {
+    cleanId = 'g:' + cleanId;
+  }
   let parsed;
   try {
-    parsed = parseChatId(groupId);
+    parsed = parseChatId(cleanId);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -572,9 +580,13 @@ app.post('/invite-to-group', async (req, res) => {
   if (!groupId || !userId) {
     return res.status(400).json({ error: 'group_id and user_id are required' });
   }
+  let cleanId = String(groupId).trim();
+  if (!cleanId.startsWith('g:') && !cleanId.startsWith('u:')) {
+    cleanId = 'g:' + cleanId;
+  }
   let parsed;
   try {
-    parsed = parseChatId(groupId);
+    parsed = parseChatId(cleanId);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -595,9 +607,13 @@ app.post('/leave-group', async (req, res) => {
   if (!groupId) {
     return res.status(400).json({ error: 'group_id is required' });
   }
+  let cleanId = String(groupId).trim();
+  if (!cleanId.startsWith('g:') && !cleanId.startsWith('u:')) {
+    cleanId = 'g:' + cleanId;
+  }
   let parsed;
   try {
-    parsed = parseChatId(groupId);
+    parsed = parseChatId(cleanId);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
