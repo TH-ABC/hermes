@@ -39,8 +39,10 @@ def push_to_build_github():
         from pathlib import Path
         v_dir = Path("D:/hermes-main/hermes-agent-vercel")
         if (v_dir / ".git").exists():
+            subprocess.run(["git", "config", "user.name", "3tmerfast-ui"], cwd=v_dir, check=True)
+            subprocess.run(["git", "config", "user.email", "3t.merfast@gmail.com"], cwd=v_dir, check=True)
             subprocess.run(["git", "add", "."], cwd=v_dir, check=True)
-            res = subprocess.run(["git", "commit", "-m", "Auto-sync from Backend Server"], cwd=v_dir, capture_output=True, text=True)
+            res = subprocess.run(["git", "commit", "-m", "Auto-sync from Backend Server", "--author=3tmerfast-ui <3t.merfast@gmail.com>"], cwd=v_dir, capture_output=True, text=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=v_dir, capture_output=True, text=True)
             print("🚀 Đã tự động push code sang GitHub Hermes-build (Vercel CI/CD)!")
     except Exception as e:
