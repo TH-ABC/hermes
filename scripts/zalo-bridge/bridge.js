@@ -21,7 +21,7 @@ const CREDS_PATH = path.join(SESSION_DIR, 'zalo_creds.json');
 const QR_PATH = path.join(SESSION_DIR, 'qr.png');
 const SEND_TIMEOUT_MS = parseInt(process.env.ZALO_SEND_TIMEOUT_MS || '60000', 10);
 const MAX_QUEUE_SIZE = 100;
-
+// Version: 1.1.0 - Support rich media and fast async notification
 if (MODE !== 'pair' && MODE !== 'resume') {
   console.error('ZALO_BRIDGE_FATAL: --mode must be "pair" or "resume"');
   process.exit(1);
@@ -40,27 +40,65 @@ try {
     .slice(0, 16);
 } catch {}
 
-// Minimal PNG-only image size reader so zca-js's imageMetadataGetter gets
-// real width/height instead of guessing it will tolerate a missing one.
-// Non-PNG images fall back to width/height 0 (zca-js only uses these for
-// upload metadata, not for rejecting the upload).
-function readPngSize(filePath) {
-  const buf = readFileSync(filePath);
-  if (buf.length < 24 || buf.toString('ascii', 1, 4) !== 'PNG') return null;
-  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+function readImageSize(filePath) {
+  try {
+    const buf = readFileSync(filePath);
+    if (buf.length < 24) return { width: 1024, height: 1024 };
+    // PNG
+    if (buf.toString('ascii', 1, 4) === 'PNG') {
+      return { width: buf.readUInt32BE(16) || 1024, height: buf.readUInt32BE(20) || 1024 };
+    }
+    // GIF
+    if (buf.toString('ascii', 0, 3) === 'GIF') {
+      return { width: buf.readUInt16LE(6) || 1024, height: buf.readUInt16LE(8) || 1024 };
+    }
+    // WEBP
+    if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
+      if (buf.toString('ascii', 12, 16) === 'VP8X' && buf.length >= 30) {
+        return { width: 1 + buf.readUIntLE(24, 3), height: 1 + buf.readUIntLE(27, 3) };
+      }
+      if (buf.toString('ascii', 12, 16) === 'VP8L' && buf.length >= 25) {
+        const b1 = buf[21], b2 = buf[22], b3 = buf[23], b4 = buf[24];
+        return {
+          width: 1 + (((b2 & 0x3f) << 8) | b1),
+          height: 1 + (((b4 & 0xf) << 10) | (b3 << 2) | ((b2 & 0xc0) >> 6)),
+        };
+      }
+      if (buf.toString('ascii', 12, 16) === 'VP8 ' && buf.length >= 30) {
+        return { width: (buf.readUInt16LE(26) & 0x3fff) || 1024, height: (buf.readUInt16LE(28) & 0x3fff) || 1024 };
+      }
+    }
+    // JPEG
+    if (buf[0] === 0xff && buf[1] === 0xd8) {
+      let offset = 2;
+      while (offset < buf.length - 8) {
+        if (buf[offset] !== 0xff) break;
+        const marker = buf[offset + 1];
+        if (marker === 0xc0 || marker === 0xc2) {
+          const height = buf.readUInt16BE(offset + 5);
+          const width = buf.readUInt16BE(offset + 7);
+          return { width: width || 1024, height: height || 1024 };
+        }
+        const len = buf.readUInt16BE(offset + 2);
+        offset += 2 + len;
+      }
+    }
+  } catch {}
+  return { width: 1024, height: 1024 };
 }
 
 async function imageMetadataGetter(filePath) {
   try {
     const stat = statSync(filePath);
-    const dims = filePath.toLowerCase().endsWith('.png') ? readPngSize(filePath) : null;
+    const dims = readImageSize(filePath);
     return {
-      width: dims?.width ?? 0,
-      height: dims?.height ?? 0,
+      width: dims.width || 1024,
+      height: dims.height || 1024,
       size: stat.size,
+      totalSize: stat.size,
     };
   } catch {
-    return null;
+    return { width: 1024, height: 1024, size: 0, totalSize: 0 };
   }
 }
 
@@ -262,6 +300,91 @@ app.get('/messages', (req, res) => {
   res.json(messageQueue.splice(0, messageQueue.length));
 });
 
+app.get('/groups', async (req, res) => {
+  if (!api || connectionState !== 'connected') {
+    return res.status(503).json({ error: 'Not connected to Zalo' });
+  }
+  try {
+    const allGroups = await api.getAllGroups();
+    const groupIds = Object.keys(allGroups?.gridVerMap || {});
+    if (groupIds.length === 0) {
+      return res.json({ groups: [] });
+    }
+    const info = await api.getGroupInfo(groupIds);
+
+    // Thu thập tất cả User ID để lấy tên thật
+    const allMemberUids = new Set();
+    for (const gid of groupIds) {
+      const g = info?.gridInfoMap?.[gid];
+      if (g && g.memVerList) {
+        for (const m of g.memVerList) {
+          const rawUid = m.split('_')[0];
+          if (rawUid) allMemberUids.add(rawUid);
+        }
+      }
+    }
+
+    let memberProfiles = {};
+    try {
+      if (allMemberUids.size > 0) {
+        const uidsArray = Array.from(allMemberUids);
+        // zca-js supports batching getGroupMembersInfo
+        const memResp = await api.getGroupMembersInfo(uidsArray);
+        memberProfiles = memResp?.profiles || {};
+      }
+    } catch (e) {
+      console.error('getGroupMembersInfo error:', e.message);
+    }
+
+    const result = [];
+    for (const gid of groupIds) {
+      const g = info?.gridInfoMap?.[gid];
+      if (g) {
+        const membersList = [];
+        for (const m of (g.memVerList || [])) {
+          const rawUid = m.split('_')[0];
+          const prof = memberProfiles[rawUid] || {};
+          let realName = prof.displayName || prof.zaloName;
+          if (!realName) {
+            if (rawUid === '7725451581835120119') realName = 'Sếp Hoàng (CEO)';
+            else if (rawUid === ownId) realName = 'Hermes Bot';
+            else realName = `Thành Viên ${rawUid.slice(-4)}`;
+          }
+
+          membersList.push({
+            uid: rawUid,
+            name: realName,
+            avatar: prof.avatar || null,
+          });
+        }
+
+        result.push({
+          id: `g:${gid}`,
+          name: g.name || `Nhóm ${gid}`,
+          totalMembers: g.totalMember || membersList.length,
+          avatar: g.avt || null,
+          members: membersList
+        });
+      }
+    }
+    res.json({ groups: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/friends', async (req, res) => {
+  if (!api || connectionState !== 'connected') {
+    return res.status(503).json({ error: 'Not connected to Zalo' });
+  }
+  try {
+    const friends = await api.getAllFriends();
+    res.json({ friends: friends || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/send', async (req, res) => {
   if (!api || connectionState !== 'connected') {
     return res.status(503).json({ error: 'Not connected to Zalo' });
@@ -315,6 +438,32 @@ app.post('/send-media', async (req, res) => {
   }
 });
 
+app.post('/send-link', async (req, res) => {
+  if (!api || connectionState !== 'connected') {
+    return res.status(503).json({ error: 'Not connected to Zalo' });
+  }
+  const { chat_id: chatId, link, msg } = req.body || {};
+  if (!chatId || !link) {
+    return res.status(400).json({ error: 'chat_id and link are required' });
+  }
+  let parsed;
+  try {
+    parsed = parseChatId(chatId);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  try {
+    const result = await enqueueSend(() =>
+      withTimeout(
+        api.sendLink({ link, msg: msg || '' }, parsed.threadId, parsed.threadType),
+      ),
+    );
+    res.json({ success: true, message_id: result?.msgId ?? null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/typing', async (req, res) => {
   if (!api || connectionState !== 'connected') {
     return res.status(503).json({ error: 'Not connected to Zalo' });
@@ -332,6 +481,107 @@ app.post('/typing', async (req, res) => {
   try {
     await enqueueSend(() => withTimeout(api.sendTypingEvent(parsed.threadId, parsed.threadType)));
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/create-group', async (req, res) => {
+  if (!api || connectionState !== 'connected') {
+    return res.status(503).json({ error: 'Not connected to Zalo' });
+  }
+  const { name, members } = req.body || {};
+  if (!name || !members || !Array.isArray(members) || members.length === 0) {
+    return res.status(400).json({ error: 'name and non-empty members array are required' });
+  }
+  try {
+    const cleanMembers = members
+      .map(m => String(m).replace(/^u:/, '').split('_')[0])
+      .filter(m => m && m !== ownId);
+
+    const result = await enqueueSend(() =>
+      withTimeout(api.createGroup({ name, members: cleanMembers }))
+    );
+    res.json({ success: true, group: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/add-group-members', async (req, res) => {
+  if (!api || connectionState !== 'connected') {
+    return res.status(503).json({ error: 'Not connected to Zalo' });
+  }
+  const { group_id: groupId, members } = req.body || {};
+  if (!groupId || !members || !Array.isArray(members)) {
+    return res.status(400).json({ error: 'group_id and members are required' });
+  }
+  let parsed;
+  try {
+    parsed = parseChatId(groupId);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  try {
+    const cleanMembers = members
+      .map(m => String(m).replace(/^u:/, '').split('_')[0])
+      .filter(m => m && m !== ownId);
+
+    const result = await enqueueSend(() =>
+      withTimeout(api.addUserToGroup(cleanMembers, parsed.threadId))
+    );
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/group-link', async (req, res) => {
+  if (!api || connectionState !== 'connected') {
+    return res.status(503).json({ error: 'Not connected to Zalo' });
+  }
+  const groupId = req.query.group_id;
+  if (!groupId) {
+    return res.status(400).json({ error: 'group_id query param is required' });
+  }
+  let parsed;
+  try {
+    parsed = parseChatId(groupId);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  try {
+    let linkDetail;
+    try {
+      linkDetail = await enqueueSend(() => withTimeout(api.getGroupLinkDetail(parsed.threadId)));
+    } catch (e) {
+      // If disabled, enable it
+      linkDetail = await enqueueSend(() => withTimeout(api.enableGroupLink(parsed.threadId)));
+    }
+    res.json({ success: true, link: linkDetail });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/invite-to-group', async (req, res) => {
+  if (!api || connectionState !== 'connected') {
+    return res.status(503).json({ error: 'Not connected to Zalo' });
+  }
+  const { group_id: groupId, user_id: userId } = req.body || {};
+  if (!groupId || !userId) {
+    return res.status(400).json({ error: 'group_id and user_id are required' });
+  }
+  let parsed;
+  try {
+    parsed = parseChatId(groupId);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  try {
+    const cleanUid = String(userId).replace(/^u:/, '').split('_')[0];
+    const result = await enqueueSend(() => withTimeout(api.inviteUserToGroups(cleanUid, parsed.threadId)));
+    res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

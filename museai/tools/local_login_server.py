@@ -105,11 +105,13 @@ async def handle_login(request: web.Request) -> web.StreamResponse:
         await push("Không có tài khoản nào cần đăng nhập.", "ALL_DONE", {"total": 0, "current": 0})
         await resp.write_eof()
         return resp
-    await push(f"🖥️ Chạy local: {total} tài khoản — Chrome sẽ mở trên máy bạn", "START", {"total": total, "current": 0})
+    auto_login.MANUAL_CAPTCHA = True
     pw = await async_playwright().start()
     use_gologin = gologin_browser.available() and os.environ.get("MUSE_LOGIN_GOLOGIN", "1") != "0"
     if use_gologin:
         await push("🦊 Dùng profile GoLogin (token) — mỗi tài khoản một profile sạch, xoá sau khi xong", "GOLOGIN")
+    else:
+        await push("🌐 Dùng Chrome thông thường (nếu gặp reCAPTCHA, bạn có thể tự click giải trực tiếp trên cửa sổ)", "CHROME")
     STOP["flag"] = False
     try:
         for idx, raw in enumerate(lines, 1):
@@ -242,6 +244,12 @@ async def handle_ping(request):
 
 
 def main():
+    import sys
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8771)
     a = ap.parse_args()

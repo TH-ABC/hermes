@@ -24,7 +24,6 @@ import {
   Activity,
   BarChart3,
   BookOpen,
-  Building2,
   Clock,
   Code,
   Cpu,
@@ -126,7 +125,7 @@ function RouteFallback({ label = "Loading…" }: { label?: string }) {
 }
 
 function RootRedirect() {
-  return <Navigate to="/sessions" replace />;
+  return <Navigate to="/office" replace />;
 }
 
 function UnknownRouteFallback({ pluginsLoading }: { pluginsLoading: boolean }) {
@@ -189,8 +188,8 @@ function ChatRouteSink() {
 const BUILTIN_NAV_REST: NavItem[] = [
   {
     path: "/office",
-    label: "Virtual Office",
-    icon: Building2,
+    label: "3D City Diorama",
+    icon: Sparkles,
   },
   {
     path: "/sessions",
@@ -408,6 +407,7 @@ export default function App() {
   const isDocsRoute = pathname === "/docs" || pathname === "/docs/";
   const normalizedPath = pathname.replace(/\/$/, "") || "/";
   const isChatRoute = normalizedPath === "/chat";
+  const isOfficeRoute = normalizedPath === "/office";
   const embeddedChat = isDashboardEmbeddedChatEnabled();
   // Defer mounting the persistent chat host (and its xterm chunk) until the
   // user has actually opened /chat at least once. Sticky after that so the
@@ -763,20 +763,22 @@ export default function App() {
             <div
               className={cn(
                 "relative z-2 flex min-w-0 min-h-0 flex-1 flex-col",
-                "px-3 sm:px-6",
+                isOfficeRoute
+                  ? "p-2 sm:p-3 overflow-hidden"
+                  : "px-3 sm:px-6",
                 isChatRoute
                   ? "pb-0 pt-1 sm:pt-2 lg:pt-4"
-                  : "pt-2 sm:pt-4 lg:pt-6",
-                isDocsRoute && "min-h-0 flex-1",
+                  : !isOfficeRoute && "pt-2 sm:pt-4 lg:pt-6",
+                (isDocsRoute || isOfficeRoute) && "min-h-0 flex-1",
               )}
             >
               <PluginSlot name="pre-main" />
               <div
                 className={cn(
                   "w-full min-w-0",
-                  !isChatRoute &&
+                  !isChatRoute && !isOfficeRoute &&
                     "pb-[calc(2rem+env(safe-area-inset-bottom,0px))] lg:pb-8",
-                  (isDocsRoute || isChatRoute) &&
+                  (isDocsRoute || isChatRoute || isOfficeRoute) &&
                     "min-h-0 flex flex-1 flex-col",
                 )}
               >

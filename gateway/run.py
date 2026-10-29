@@ -1753,6 +1753,8 @@ _AUTO_APPEND_MEDIA_TOOL_NAMES = {
     "text_to_speech_tool",
     "image_generate",
     "bfl_flux3_get_result",
+    "muse_generate_media",
+    "generate_media",
 }
 
 # ---- helpers: detect interrupted tool tails & auto-continue noise ----------

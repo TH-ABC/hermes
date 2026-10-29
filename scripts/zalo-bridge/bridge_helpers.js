@@ -48,12 +48,26 @@ export function messageToEvent(message) {
     ? data.mentions.map((m) => ({ uid: m.uid, pos: m.pos, len: m.len }))
     : [];
 
+  let text = '';
+  if (typeof data.content === 'string') {
+    text = data.content;
+  } else if (data.content && typeof data.content === 'object') {
+    text = data.content.description || data.content.caption || data.content.title || data.content.text || '';
+  }
+
+  let attachmentUrl = null;
+  if (data.content && typeof data.content === 'object') {
+    attachmentUrl = data.content.href || data.content.hdUrl || data.content.url || data.content.thumb || null;
+  }
+
   return {
     chat_id: formatChatId(message.threadId, message.type),
     is_group: Boolean(isGroup),
     message_id: data.msgId !== undefined ? String(data.msgId) : null,
-    text: typeof data.content === 'string' ? data.content : '',
+    text: text,
     content_type: data.msgType || 'unknown',
+    attachment_url: attachmentUrl,
+    raw_content: data.content,
     sender_id: data.uidFrom !== undefined ? String(data.uidFrom) : null,
     sender_name: data.dName || null,
     timestamp: data.ts !== undefined ? Number(data.ts) : null,

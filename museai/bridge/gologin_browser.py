@@ -25,7 +25,7 @@ def token() -> str:
         return tok
     for p in CONFIG_PATHS:
         try:
-            with open(os.path.expanduser(p), encoding="utf-8") as f:
+            with open(os.path.expanduser(p), encoding="utf-8-sig") as f:
                 tok = (json.load(f).get("token") or "").strip()
             if tok and "YOUR_GOLOGIN_API_TOKEN" not in tok:
                 return tok
@@ -56,13 +56,31 @@ def _cli(args: list, timeout: int = 120) -> str:
 
 
 def _debug_port(profile_id: str) -> Optional[int]:
-    out = subprocess.run(["ps", "-axo", "command"], capture_output=True, text=True).stdout
-    for line in out.splitlines():
-        if f"gologin_profile_{profile_id}" in line:
-            m = re.search(r"--remote-debugging-port=(\d+)", line)
-            if m:
-                return int(m.group(1))
+    try:
+        import psutil
+        for proc in psutil.process_iter(['name']):
+            try:
+                name = (proc.info.get('name') or '').lower()
+                if 'chrome' in name or 'orbita' in name:
+                    cmdline = proc.cmdline()
+                    line = " ".join(cmdline)
+                    if f"gologin_profile_{profile_id}" in line:
+                        m = re.search(r"--remote-debugging-port=(\d+)", line)
+                        if m:
+                            return int(m.group(1))
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except Exception:
+        pass
+    if os.name != "nt":
+        out = subprocess.run(["ps", "-axo", "command"], capture_output=True, text=True).stdout
+        for line in out.splitlines():
+            if f"gologin_profile_{profile_id}" in line:
+                m = re.search(r"--remote-debugging-port=(\d+)", line)
+                if m:
+                    return int(m.group(1))
     return None
+
 
 
 def _open_sync(name: str, proxy: Optional[Dict]) -> Dict:
@@ -77,7 +95,7 @@ def _open_sync(name: str, proxy: Optional[Dict]) -> Dict:
     pid = json.loads(_cli(args, timeout=150))["profileId"]
     session = f"muse-{pid[:8]}"
     try:
-        _cli(["open", "about:blank", "--profile", pid, "--session", session], timeout=120)
+        _cli(["open", "about:blank", "--profile", pid, "--session", session, "--headed"], timeout=120)
         port = None
         for _ in range(20):
             port = _debug_port(pid)
@@ -95,13 +113,27 @@ def _open_sync(name: str, proxy: Optional[Dict]) -> Dict:
 def _close_sync(h: Dict):
     pid = h["profile_id"]
     try:
-        _cli(["close", "--session", h["session"]], timeout=30)
+        import psutil
+        for proc in psutil.process_iter(['name']):
+            try:
+                name = (proc.info.get('name') or '').lower()
+                if 'chrome' in name or 'orbita' in name:
+                    cmdline = proc.cmdline()
+                    if any(f"gologin_profile_{pid}" in str(arg) for arg in cmdline):
+                        proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
     except Exception:
         pass
-    subprocess.run(["pkill", "-9", "-f", f"gologin_profile_{pid}"], capture_output=True)
+    if os.name != "nt":
+        subprocess.run(["pkill", "-9", "-f", f"gologin_profile_{pid}"], capture_output=True)
+    try:
+        _cli(["close", "--session", h["session"]], timeout=10)
+    except Exception:
+        pass
     for attempt in range(3):
         try:
-            _cli(["profile-delete", pid, "--remote"], timeout=60)
+            _cli(["profile-delete", pid, "--remote"], timeout=30)
             return
         except Exception as e:
             if attempt == 2:

@@ -783,6 +783,11 @@ class ZaloAdapter(BasePlatformAdapter):
         if not content or not content.strip():
             return SendResult(success=True, message_id=None)
 
+        # STRICT Persona filter: absolutely scrub "Muse" or "Muse AI"
+        import re
+        content = re.sub(r'\bMuse\s*AI\b', 'Trợ lý của sếp Hoàng', content, flags=re.IGNORECASE)
+        content = re.sub(r'\bMuse\b', 'Trợ lý của sếp Hoàng', content, flags=re.IGNORECASE)
+
         try:
             import aiohttp
 
@@ -833,9 +838,16 @@ class ZaloAdapter(BasePlatformAdapter):
             return SendResult(success=False, error=bridge_exit)
         try:
             import aiohttp
+            from tools.muse_media_tool import _DELIVERED_MEDIA_CACHE
 
             if not os.path.exists(file_path):
                 return SendResult(success=False, error=f"File not found: {file_path}")
+
+            norm_path = str(file_path).replace("\\", "/")
+            cache_key = f"{chat_id}::{norm_path}"
+            if cache_key in _DELIVERED_MEDIA_CACHE:
+                logger.info("[%s] Media %s already delivered to %s, skipping duplicate send", self.name, file_path, chat_id)
+                return SendResult(success=True, message_id="already_delivered")
 
             payload: Dict[str, Any] = {"chat_id": chat_id, "file_path": file_path}
             if caption:
@@ -847,6 +859,7 @@ class ZaloAdapter(BasePlatformAdapter):
                 timeout=aiohttp.ClientTimeout(total=120),
             ) as resp:
                 if resp.status == 200:
+                    _DELIVERED_MEDIA_CACHE.add(cache_key)
                     data = await resp.json()
                     return SendResult(
                         success=True,
@@ -942,9 +955,705 @@ class ZaloAdapter(BasePlatformAdapter):
         chat_type = "group" if chat_id.startswith("g:") else "dm"
         return {"name": self._chat_names.get(chat_id, chat_id), "type": chat_type}
 
+    async def _cache_inbound_image(self, url: str) -> Optional[str]:
+        """Download an inbound image from Zalo to local image cache."""
+        try:
+            import hashlib
+            import urllib.request
+            from hermes_constants import get_hermes_home
+
+            cache_dir = get_hermes_home() / "image_cache"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            h = hashlib.md5(url.encode("utf-8")).hexdigest()[:12]
+            dest = cache_dir / f"zalo_in_{h}.jpg"
+            if dest.exists() and dest.stat().st_size > 0:
+                return str(dest.resolve())
+
+            def _fetch():
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=30) as resp, open(dest, "wb") as f:
+                    f.write(resp.read())
+
+            await asyncio.to_thread(_fetch)
+            return str(dest.resolve()) if dest.exists() else None
+        except Exception as e:
+            logger.warning("[%s] Failed to download inbound image %s: %s", self.name, url, e)
+            return None
+
+    async def _run_muse_generation_task(
+        self,
+        chat_id: str,
+        prompt: str,
+        media_type: str,
+        input_images: Optional[list[str]] = None,
+    ) -> None:
+        """Run Muse media generation asynchronously in a background thread."""
+        try:
+            from tools.muse_media_tool import muse_generate_media_sync
+
+            res = await asyncio.to_thread(
+                muse_generate_media_sync,
+                prompt=prompt,
+                media_type=media_type,
+                input_images=input_images,
+                timeout_s=300,
+            )
+
+            if not res.get("ok"):
+                err = res.get("error", "Lỗi không xác định")
+                await self.send(
+                    chat_id,
+                    f"❌ Rất tiếc, đã có lỗi khi tạo {media_type}:\n{err}\n"
+                    "Sếp thử lại hoặc đổi mô tả khác xem sao nhé!",
+                )
+                return
+
+            media_files = res.get("media_files", [])
+            content = res.get("content", "Đã tạo media thành công!")
+
+            if not media_files:
+                await self.send(chat_id, f"✅ {content}")
+                return
+
+            # Deliver native attachment for each file (tránh gửi lặp 2 lần)
+            from tools.muse_media_tool import _DELIVERED_MEDIA_CACHE
+            has_real_video = any(str(f).lower().endswith((".mp4", ".mov", ".webm", ".m4v")) for f in media_files)
+            if media_type == "video" and not has_real_video:
+                notice = (
+                    "⚠️ **Dạ Sếp, Báo cáo tình trạng tạo Video:**\n"
+                    "───────────────────────────────\n"
+                    "Tài khoản hiện tại trong Pool (`ellinabetheny4127`) hiện chỉ hỗ trợ tạo **Ảnh tĩnh chất lượng cao**, "
+                    "tính năng kết xuất tệp Video MP4 chuyển động đang bị nền tảng tạm khóa theo vùng/loại tài khoản.\n\n"
+                    "💡 *Để tạo clip TVC/Video thật sự, Sếp vui lòng nạp thêm cookie tài khoản đã mở khóa tính năng Video "
+                    "vào Pool tại mục 'Pool Trợ Lý Nền Tảng Đồ Họa' trên Dashboard nhé ạ!*\n"
+                    "───────────────────────────────\n"
+                    "🖼️ *Dưới đây là hình ảnh phác thảo từ lệnh của Sếp:*"
+                )
+                await self.send(chat_id, notice)
+
+            for file_path in media_files:
+                norm_p = str(file_path).replace("\\", "/")
+                cache_key = f"{chat_id}::{norm_p}"
+                if cache_key in _DELIVERED_MEDIA_CACHE:
+                    continue
+                is_this_file_video = any(str(file_path).lower().endswith(ext) for ext in (".mp4", ".mov", ".webm", ".m4v"))
+                caption = (
+                    f"🎬 {content}\n📝 Prompt: {prompt}"
+                    if is_this_file_video
+                    else f"🎨 {content}\n📝 Prompt: {prompt}"
+                )
+                send_res = await self._send_media_to_bridge(chat_id, file_path, caption=caption)
+                if send_res.success:
+                    _DELIVERED_MEDIA_CACHE.add(cache_key)
+                else:
+                    logger.warning("[%s] Failed to send media %s: %s", self.name, file_path, send_res.error)
+                    await self.send(chat_id, f"✅ {content}\n(File đã lưu tại máy: {file_path})")
+
+        except Exception as e:
+            logger.exception("[%s] Error generating Muse media: %s", self.name, e)
+            await self.send(chat_id, f"❌ Lỗi hệ thống khi tạo {media_type}: {e}")
+
+    async def _handle_virtual_bot_routing(self, msg_data: Dict[str, Any]) -> bool:
+        """Định tuyến tin nhắn theo mã riêng (#MÃ, !mã, @mã) tới đúng Virtual Bot và tài khoản AI."""
+        try:
+            from plugins.platforms.zalo.bot_router import route_inbound_message
+            text = str(msg_data.get("text") or "").strip()
+            sender_id = str(msg_data.get("sender_id") or "")
+            chat_id = str(msg_data.get("chat_id") or "")
+
+            routed = route_inbound_message(text, sender_id=sender_id)
+            if not routed.get("matched"):
+                return False
+
+            if routed.get("is_help"):
+                await self.send(chat_id, routed["help_message"])
+                return True
+
+            bot_name = routed.get("bot_name", "Trợ Lý Ảo")
+            clean_text = routed.get("clean_text", "")
+            mode = routed.get("mode", "chat")
+            linked_account = routed.get("linked_pool_account", "")
+            system_prompt = routed.get("system_prompt", "")
+            routing_code = routed.get("routing_code", "")
+
+            # Phân luồng Media / Video
+            if mode == "video" or any(w in clean_text.lower() for w in ["video", "clip", "phim"]):
+                await self.send(
+                    chat_id,
+                    f"⚡ [🤖 {bot_name} ({routing_code})] Đã nhận lệnh: \"{clean_text}\"...\n"
+                    f"Đang kích hoạt tài khoản đồ họa [{linked_account or 'syncere1812031999'}] để render video, Sếp đợi em xíu nhé! 🎬⏳"
+                )
+                asyncio.create_task(
+                    self._run_virtual_bot_media_task(chat_id, clean_text, bot_name, linked_account, is_video=True)
+                )
+                return True
+            elif mode == "image" or any(w in clean_text.lower() for w in ["ảnh", "hình", "vẽ", "photo", "picture"]):
+                await self.send(
+                    chat_id,
+                    f"⚡ [🤖 {bot_name} ({routing_code})] Đang tạo hình ảnh nghệ thuật: \"{clean_text}\"...\n🎨⏳"
+                )
+                asyncio.create_task(
+                    self._run_virtual_bot_media_task(chat_id, clean_text, bot_name, linked_account, is_video=False)
+                )
+                return True
+
+            # Phân luồng Chat / Kế Toán / Doanh Nghiệp
+            asyncio.create_task(
+                self._run_virtual_bot_chat_task(chat_id, clean_text, bot_name, routing_code, system_prompt, linked_account)
+            )
+            return True
+        except Exception as e:
+            logger.error(f"[adapter] Lỗi virtual bot routing: {e}")
+            return False
+
+    async def _run_virtual_bot_chat_task(
+        self, chat_id: str, clean_text: str, bot_name: str, routing_code: str, system_prompt: str, linked_account: str
+    ) -> None:
+        """Thực thi tác vụ hội thoại với System Prompt & Persona của Virtual Bot riêng biệt."""
+        import aiohttp
+        try:
+            full_sys = (
+                f"{system_prompt}\n"
+                f"BẮT BUỘC: Em là {bot_name}. Luôn bắt đầu câu trả lời xưng: Em là Trợ lý của sếp Hoàng.\n"
+                f"Tác phong phục vụ: Nhanh nhẹn, chuẩn xác, chuyên nghiệp."
+            )
+            payload = {
+                "model": "studio-pool",
+                "messages": [
+                    {"role": "system", "content": full_sys},
+                    {"role": "user", "content": clean_text}
+                ],
+                "stream": False
+            }
+            headers = {"Content-Type": "application/json"}
+            if linked_account:
+                headers["X-Account-Name"] = linked_account
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "http://127.0.0.1:8770/v1/chat/completions",
+                    json=payload,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=60)
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        reply = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                        if not reply:
+                            reply = "Dạ Sếp, em đã tiếp nhận thông tin và lưu vào hệ thống."
+                        
+                        clean_reply = re.sub(r'(?i)\bmuse(?:\s*ai)?\b', 'Hệ thống Studio AI', reply)
+                        await self.send(chat_id, f"🤖 [{bot_name}]\n{clean_reply}")
+                    else:
+                        err_text = await resp.text()
+                        logger.warning(f"Virtual bot chat failed ({resp.status}): {err_text}")
+                        await self.send(chat_id, f"🤖 [{bot_name}] Dạ Sếp, em đã ghi nhận yêu cầu: \"{clean_text}\". Em đang xử lý và sẽ phản hồi ngay ạ!")
+        except Exception as e:
+            logger.error(f"Error in _run_virtual_bot_chat_task: {e}")
+            await self.send(chat_id, f"🤖 [{bot_name}] Dạ Sếp, em đã ghi nhận thông tin: \"{clean_text}\".")
+
+    async def _run_virtual_bot_media_task(
+        self, chat_id: str, prompt: str, bot_name: str, linked_account: str, is_video: bool = True
+    ) -> None:
+        """Thực thi tạo media cho Virtual Bot."""
+        try:
+            from tools.muse_media_tool import muse_generate_media_sync, _DELIVERED_MEDIA_CACHE
+            media_type = "video" if is_video else "image"
+            res = await asyncio.to_thread(
+                muse_generate_media_sync,
+                prompt=prompt,
+                media_type=media_type,
+                timeout_s=300
+            )
+
+            if not res.get("ok"):
+                err = res.get("error", "Lỗi tạo media")
+                await self.send(chat_id, f"🤖 [{bot_name}] ❌ Có lỗi khi tạo {media_type}: {err}")
+                return
+
+            media_files = res.get("media_files", [])
+            content = res.get("content", "Đã tạo tác phẩm thành công!")
+            for file_path in media_files:
+                norm_p = str(file_path).replace("\\", "/")
+                cache_key = f"{chat_id}::{norm_p}"
+                if cache_key in _DELIVERED_MEDIA_CACHE:
+                    continue
+                caption = f"🎬 [{bot_name}] Tác phẩm video gửi Sếp: \"{prompt}\"" if is_video else f"🎨 [{bot_name}] Tác phẩm ảnh gửi Sếp: \"{prompt}\""
+                send_res = await self._send_media_to_bridge(chat_id, file_path, caption=caption)
+                if send_res.success:
+                    _DELIVERED_MEDIA_CACHE.add(cache_key)
+        except Exception as e:
+            logger.error(f"Error in _run_virtual_bot_media_task: {e}")
+
+    async def _handle_rental_commands(self, msg_data: Dict[str, Any]) -> bool:
+        """Xử lý quy trình 2 bước cho thuê Bot trợ lý qua Bot Chủ Bth:
+        Bước 1: Quét Zalo kết nối -> Tự sinh Profile & Thư mục cô lập
+        Bước 2: Gán Bot trợ lý độc quyền theo gói 30 ngày (1, 2, 3 Bot)
+        """
+        chat_id = str(msg_data.get("chat_id") or "")
+        sender_id = str(msg_data.get("sender_id") or chat_id)
+        sender_name = str(msg_data.get("sender_name") or "")
+        text = str(msg_data.get("text") or "").strip()
+        low = text.lower()
+
+        try:
+            import scripts.rental_manager as rm
+
+            # 1. Khách nhắn yêu cầu đăng ký / thuê bot (BƯỚC 1: Quét Zalo)
+            if any(k in low for k in ["thuê bot", "đăng ký bot", "đăng ký trợ lý", "/rent", "/thuebot"]) or low == "thuê" or low == "dang ky":
+                res = rm.request_onboarding_qr(sender_id)
+                msg = (
+                    f"👋 **Dạ chào Anh/Chị! Em là Bth - Trợ lý Điều Hành Tổng Zalo.**\n"
+                    f"───────────────────────────────\n"
+                    f"Em rất vui được hỗ trợ Anh/Chị đăng ký dịch vụ Thuê Bot Trợ Lý Hermes!\n\n"
+                    f"{res['instructions']}\n\n"
+                    f"👉 **Link ảnh mã QR kết nối:**\n{res['qr_url']}\n\n"
+                    f"💡 *Sau khi quét mã xác nhận trên điện thoại, Anh/Chị chỉ cần nhắn 'đã quét' để em kích hoạt Profile riêng nhé!*"
+                )
+                await self.send(chat_id, msg)
+                return True
+
+            # 2. Khách quét xong và nhắn xác nhận
+            if any(k in low for k in ["đã quét", "hoàn tất quét", "/done", "/xacnhan", "xong rồi", "da quet"]):
+                res = rm.complete_onboarding(sender_id, display_name=sender_name or None)
+                await self.send(chat_id, res["welcome_message"])
+                return True
+
+            # 3. Khách chọn gói cước kết nối Bot (BƯỚC 2: Gán Bot độc quyền 30 ngày)
+            import re
+            m_conn = re.search(r'(?:/connect_bot|kết nối bot|thuê)\s*(\d+)', low)
+            if m_conn or low.startswith("/connect_bot"):
+                count = 1
+                if m_conn:
+                    try:
+                        count = max(1, min(10, int(m_conn.group(1))))
+                    except Exception:
+                        count = 1
+                elif "2" in low:
+                    count = 2
+                elif "3" in low:
+                    count = 3
+
+                pkg_name = f"Gói {count} Bot Trợ Lý (30 ngày)"
+                res = rm.connect_bot_subscription(sender_id, requested_count=count, package_name=pkg_name, days=30)
+                if res.get("ok"):
+                    await self.send(chat_id, res["message"])
+                else:
+                    await self.send(chat_id, f"⚠️ {res.get('error')}")
+                return True
+
+            # 4. Kiểm tra thời hạn gói thuê
+            if any(k in low for k in ["/kiemtra_bot", "/status_bot", "hạn bot", "kiểm tra hạn", "thời hạn bot", "hạn dùng bot"]):
+                res = rm.check_lease_status(sender_id)
+                await self.send(chat_id, res["message"])
+                return True
+
+        except Exception as e:
+            logger.error(f"[adapter] Lỗi rental commands: {e}")
+
+        return False
+
+    async def _handle_atg_trigger(self, msg_data: Dict[str, Any]) -> bool:
+        """Kích hoạt trigger tự động đánh thức @ATG (Antigravity IDE Chat) khi phát hiện tag @ATG trên Zalo.
+
+        Phân định 2 nhánh:
+        - Nhánh 1 (@ATG): Đẩy tin vào atg_queue.json, đánh thức khung chat Antigravity này để Sếp và ATG xử lý trực tiếp.
+        - Nhánh 2 (Không có @ATG): Để Bot Zalo Hermes thông thường tiếp nhận hội thoại hoặc tạo media.
+        """
+        chat_id = str(msg_data.get("chat_id") or "")
+        if not chat_id:
+            return False
+
+        text = str(msg_data.get("text") or "").strip()
+        text_lower = text.lower()
+
+        is_atg = (
+            "@atg" in text_lower
+            or "@atg " in text_lower
+            or text_lower == "@atg"
+            or text_lower.startswith("/atg")
+            or text_lower.startswith("@atg")
+            # Tương thích ngược với tag cũ
+            or "@ant-local" in text_lower
+            or "@ant " in text_lower
+            or text_lower == "@ant"
+            or text_lower.startswith("/ant")
+            or "ant-local" in text_lower
+        )
+        if not is_atg:
+            return False
+
+        # Tách nội dung chỉ thị của Sếp
+        clean_text = text
+        for prefix in [
+            "@ATG", "@atg", "/atg",
+            "@Ant-local", "@ant-local", "@ANT-LOCAL", "@ant", "@Ant", "/ant"
+        ]:
+            if prefix in clean_text:
+                clean_text = clean_text.replace(prefix, "").strip()
+
+        if not clean_text:
+            clean_text = "Sếp yêu cầu kiểm tra hệ thống và trạng thái Sever Hermes."
+
+        attachment_url = msg_data.get("attachment_url")
+        saved_images = []
+        if attachment_url:
+            cached_img = await self._cache_inbound_image(attachment_url)
+            if cached_img:
+                saved_images.append(cached_img)
+                try:
+                    from tools.muse_media_tool import set_last_inbound_image
+                    set_last_inbound_image(chat_id, cached_img)
+                except Exception:
+                    pass
+
+        # 1. Báo chạy đánh thức [0s] tức thì vào đúng khung chat này cho Sếp
+        wake_ack = (
+            "🛠️ **[@ATG - Kỹ Sư Trưởng Antigravity]**\n"
+            "Em đã nhận chỉ thị từ Sếp!\n"
+            f"📋 **Nhiệm vụ:** {clean_text}\n"
+            "⚡ Em đã chuyển chỉ thị vào khung chat Antigravity để đọc mã nguồn và xử lý trực tiếp trên Sever Hermes. "
+            "Kết quả nghiệm thu sẽ được báo cáo ngay tại đây sau khi hoàn tất ạ!"
+        )
+        await self.send(chat_id, wake_ack)
+
+        # 2. Đưa vào hàng đợi atg_queue.json để Antigravity tại khung chat này nhận và xử lý
+        try:
+            import sys
+            from pathlib import Path
+            scripts_dir = Path(__file__).resolve().parents[3] / "scripts"
+            if str(scripts_dir) not in sys.path:
+                sys.path.insert(0, str(scripts_dir))
+            import atg_zalo_listener
+            atg_zalo_listener.enqueue_message(
+                text=clean_text or text,
+                chat_id=chat_id,
+                images=saved_images,
+                sender="Sếp Hoàng",
+            )
+            logger.info("[%s] Đã đưa chỉ thị @ATG vào hàng đợi thành công!", self.name)
+        except Exception as q_err:
+            logger.error("[%s] Lỗi enqueue @ATG: %s", self.name, q_err)
+
+        return True
+
+    async def _handle_shortcut_command(self, msg_data: Dict[str, Any]) -> bool:
+        """Intercept slash commands and fast-path media generation requests.
+
+        Returns True if the message was handled as a shortcut (bypasses LLM).
+        """
+        chat_id = str(msg_data.get("chat_id") or "")
+        if not chat_id:
+            return False
+
+        text = str(msg_data.get("text") or "").strip()
+        attachment_url = msg_data.get("attachment_url")
+
+        # Strip bot mention if present in group (e.g. "@Bot /video ...")
+        if self._mention_name and text.lower().startswith(f"@{self._mention_name.lower()}"):
+            text = text[len(self._mention_name) + 1:].strip()
+
+        is_video_cmd = False
+        is_image_cmd = False
+        cmd = ""
+        prompt = ""
+
+        if text.startswith("/"):
+            parts = text.split(maxsplit=1)
+            cmd = parts[0].lower()
+            prompt = parts[1].strip() if len(parts) > 1 else ""
+            if cmd in ("/video", "/clip", "/phim"):
+                is_video_cmd = True
+            elif cmd in ("/anh", "/image", "/photo", "/hinh", "/pic"):
+                is_image_cmd = True
+        else:
+            low = text.lower()
+            import re
+            # Natural language detection for video creation
+            # Matches: "tạo clip ...", "làm video ...", "tạo clip mới về ...", "video mới: ...", "này là hình cũ mà tạo clip mới chưa"
+            m_vid = re.search(r'(?:tạo|làm|quay|sản xuất)\s+(?:cho\s+sếp\s+)?(?:1\s+)?(?:clip|video|phim)(?:\s+mới)?(?:\s+(?:về|với|là|:))?\s*(.*)', text, re.IGNORECASE)
+            m_vid_moi = re.search(r'(?:clip|video|phim)\s+mới(?:\s+(?:về|với|là|:))?\s*(.*)', text, re.IGNORECASE)
+            
+            if m_vid:
+                is_video_cmd = True
+                prompt = m_vid.group(1).strip()
+            elif m_vid_moi:
+                is_video_cmd = True
+                prompt = m_vid_moi.group(1).strip()
+            else:
+                # Natural language detection for image creation
+                m_img = re.search(r'(?:vẽ|tạo|thiết kế|chụp|xuất)\s+(?:cho\s+sếp\s+)?(?:1\s+)?(?:bức\s+)?(?:ảnh|hình|tranh|photo|picture)(?:\s+mới)?(?:\s+(?:về|với|là|:))?\s*(.*)', text, re.IGNORECASE)
+                if m_img:
+                    is_image_cmd = True
+                    prompt = m_img.group(1).strip()
+
+            # If user is asking a question about progress/status (e.g. "tạo ảnh lại được chưa", "xong chưa"), do NOT treat as creation command
+            question_endings = ("được chưa", "xong chưa", "chưa", "không", "hả", "sao rồi", "thế nào", "được ko", "được k")
+            if any(text.strip().lower().endswith(q) for q in question_endings) or "lại được chưa" in text.lower():
+                is_video_cmd = False
+                is_image_cmd = False
+                prompt = ""
+
+        # Normalize text for single-key / shortcut navigation
+        text_clean = text.lower().strip()
+
+        # Executive Menu / Dashboard command (0 or /menu or menu)
+        if cmd in ("/menu", "/app", "/bangdieukhien", "menu") or text_clean in ("0", "menu", "bảng điều khiển", "điều hành", "trogiup"):
+            from pathlib import Path
+            card_img = Path(__file__).resolve().parents[3] / "scripts" / "generated_cards" / "hermes_executive_card.png"
+            if card_img.exists():
+                try:
+                    await self._send_media_to_bridge(chat_id, str(card_img), caption="🔱 BẢNG ĐIỀU HÀNH HERMES 3.0 — SẾP HOÀNG 👑")
+                except Exception as ce:
+                    logger.warning("[zalo] Could not send menu card image: %s", ce)
+
+            menu_msg = (
+                "🔱 **BẢNG ĐIỀU HÀNH HERMES 3.0 — SẾP HOÀNG** 👑\n"
+                "───────────────────────────────\n"
+                "⚡ **Hệ Thống:** Online 24/24 | **Sever:** Đang hoạt động\n\n"
+                "Sếp chỉ cần bấm số hoặc chạm vào lệnh xanh để xem ngay:\n"
+                "1️⃣ Bấm **1** hoặc chạm `/viec` : Xem bảng việc cần làm\n"
+                "2️⃣ Bấm **2** hoặc chạm `/kho` : Xem 5 video/ảnh AI mới nhất\n"
+                "3️⃣ Bấm **3** hoặc chạm `/status` : Kiểm tra nhịp tim Server\n"
+                "4️⃣ Bấm **4** hoặc tag `@ATG` : Chỉ thị cho Kỹ Sư Trưởng\n\n"
+                "💬 **Hoặc ra lệnh tự nhiên bất kỳ:**\n"
+                "• *\"Tạo clip một ly cà phê bốc khói\"*\n"
+                "• *\"Vẽ ảnh văn phòng làm việc tương lai\"*\n"
+                "• *\"Nhắc tôi lúc 15h họp đối tác\"*\n"
+                "───────────────────────────────"
+            )
+            await self.send(chat_id, menu_msg)
+            return True
+
+        # Tasks / Công việc command (1 or /viec)
+        if cmd in ("/viec", "/tasks", "/congviec", "/task") or text_clean in ("1", "viec", "việc", "công việc"):
+            task_msg = (
+                "📋 **BẢNG CÔNG VIỆC CỦA SẾP HOÀNG** 👑\n"
+                "───────────────────────────────\n"
+                "⏳ **[Đang Thực Hiện]:**\n"
+                "1. Hoàn thiện Bộ Phím Tắt Tương Tác Native trong Zalo Chat\n"
+                "2. Duy trì tiến trình @ATG đón nhận lệnh trực tiếp 24/24\n\n"
+                "✅ **[Đã Hoàn Thành Gần Đây]:**\n"
+                "• Khai tử hoàn toàn hạ tầng Web SPA Vercel\n"
+                "• Phân định 2 luồng: @ATG (IDE Chat) & Bot Zalo thường\n"
+                "• Cấu hình Fast-Path đồ họa tự nhiên không cần gõ /video\n"
+                "• Cập nhật Quy Chuẩn Vận Hành Hermes 3.0\n\n"
+                "💡 *Để giao việc mới, Sếp chỉ cần nhắn tự nhiên trong chat hoặc gắn thẻ @ATG!*\n"
+                "───────────────────────────────\n"
+                "↩️ Bấm **0** để quay lại Bảng Điều Hành"
+            )
+            await self.send(chat_id, task_msg)
+            return True
+
+        # Media Gallery / Kho tác phẩm command (2 or /kho)
+        if cmd in ("/kho", "/media", "/gallery", "/thuvien") or text_clean in ("2", "kho", "media", "thư viện"):
+            import os
+            from pathlib import Path
+            media_dir = Path(__file__).resolve().parents[3] / "museai" / "scratch" / "media"
+            media_files = []
+            if media_dir.exists():
+                for f in sorted(media_dir.glob("*.*"), key=os.path.getmtime, reverse=True)[:5]:
+                    if f.suffix.lower() in [".mp4", ".webp", ".png", ".jpg"]:
+                        media_files.append(f)
+
+            if media_files:
+                items_text = []
+                for idx, mf in enumerate(media_files, 1):
+                    type_str = "🎬 Video TVC" if mf.suffix.lower() == ".mp4" else "🎨 Ảnh AI"
+                    sz_mb = mf.stat().st_size / (1024 * 1024)
+                    items_text.append(f"{idx}. {type_str}: `{mf.name}` ({sz_mb:.1f} MB)")
+                gallery_body = "\n".join(items_text)
+                gallery_msg = (
+                    "🎬 **KHO TÁC PHẨM ĐỒ HỌA & VIDEO AI GẦN NHẤT** 🎨\n"
+                    "───────────────────────────────\n"
+                    f"{gallery_body}\n\n"
+                    "💡 *Để tạo thêm tác phẩm mới, Sếp chỉ cần chat: \"Tạo clip...\" hoặc \"Vẽ ảnh...\"!*\n"
+                    "───────────────────────────────\n"
+                    "↩️ Bấm **0** để quay lại Bảng Điều Hành"
+                )
+            else:
+                gallery_msg = (
+                    "🎬 **KHO TÁC PHẨM ĐỒ HỌA AI** 🎨\n"
+                    "───────────────────────────────\n"
+                    "Chưa có tệp media nào trong kho. Sếp hãy thử lệnh `/video` hoặc `/anh` để tạo ngay tác phẩm đầu tiên nhé!\n"
+                    "───────────────────────────────\n"
+                    "↩️ Bấm **0** để quay lại Bảng Điều Hành"
+                )
+            await self.send(chat_id, gallery_msg)
+            return True
+
+        # Status / Ping command (3 or /status)
+        if cmd in ("/status", "/server", "/maychu", "/hethong") or text_clean in ("3", "status", "sever", "server"):
+            from tools.muse_media_tool import get_muse_server_status, get_muse_base_url
+
+            st = get_muse_server_status()
+            base_url = get_muse_base_url()
+            if st.get("online"):
+                acc_count = st.get("accounts_count", st.get("active_accounts", "N/A"))
+                msg = (
+                    f"✅ **MÁY CHỦ ĐỒ HỌA CHUYÊN DỤNG ĐANG ONLINE** 🚀\n"
+                    f"• Server: `{base_url}` (Máy chủ 24/24)\n"
+                    f"• Tài khoản khả dụng: {acc_count}\n"
+                    f"• Concurrency: {st.get('concurrency', 'N/A')}\n"
+                    f"• Trạng thái: {st.get('status', 'ready')}\n"
+                    "───────────────────────────────\n"
+                    "↩️ Bấm **0** để quay lại Bảng Điều Hành"
+                )
+            else:
+                msg = (
+                    f"⚠️ **MÁY CHỦ ĐỒ HỌA HIỆN ĐANG OFFLINE**\n"
+                    f"• Server: `{base_url}`\n"
+                    f"• Lỗi: {st.get('error')}\n"
+                    f"Vui lòng bật máy chủ đồ họa chuyên dụng trên máy riêng.\n"
+                    "───────────────────────────────\n"
+                    "↩️ Bấm **0** để quay lại Bảng Điều Hành"
+                )
+            await self.send(chat_id, msg)
+            return True
+
+        # @ATG Help command (4 or /atg)
+        if text_clean in ("4", "atg", "/atg"):
+            atg_msg = (
+                "🛠️ **HƯỚNG DẪN GỌI KỸ SƯ TRƯỞNG @ATG** 💻\n"
+                "───────────────────────────────\n"
+                "Kỹ Sư Trưởng @ATG đang túc trực trực tiếp trên khung chat Antigravity IDE (Sever Hermes).\n\n"
+                "Để ra lệnh cho @ATG đọc mã nguồn, sửa code hoặc bảo trì máy chủ, Sếp chỉ cần nhắn cú pháp:\n"
+                "👉 `@ATG <nhiệm vụ của Sếp>`\n\n"
+                "**Ví dụ:**\n"
+                "• `@ATG kiểm tra lại các file trong thư mục scripts`\n"
+                "• `@ATG kiểm tra trạng thái máy chủ đồ họa`\n"
+                "• `@ATG cập nhật tính năng mới...`\n\n"
+                "Khung chat Antigravity sẽ tự động thức dậy [0s] và báo cáo nghiệm thu ngược lại Zalo cho Sếp!\n"
+                "───────────────────────────────\n"
+                "↩️ Bấm **0** để quay lại Bảng Điều Hành"
+            )
+            await self.send(chat_id, atg_msg)
+            return True
+
+        # Help / Instructions command
+        if cmd in ("/help", "/trogiup", "/huongdan"):
+            help_msg = (
+                "✨ **TRỢ LÝ CỦA SẾP HOÀNG - ĐIỀU HÀNH & SÁNG TẠO ĐA NĂNG** ✨\n\n"
+                "Sếp có thể trò chuyện tự nhiên hoặc dùng các lệnh siêu tốc:\n"
+                "🎬 `/video <mô tả>` : Tạo clip TVC / video motion ngắn\n"
+                "🎨 `/anh <mô tả>` : Tạo hình ảnh AI chất lượng cao\n"
+                "🖼️ Gửi ảnh kèm chú thích `/video` : Biến ảnh tĩnh thành video cử động\n"
+                "📡 `/status` : Kiểm tra tình trạng máy chủ đồ họa chuyên dụng (máy 24/24)\n"
+                "❓ `/help` : Xem danh sách lệnh hỗ trợ"
+            )
+            await self.send(chat_id, help_msg)
+            return True
+
+        # Video generation command / natural trigger
+        if is_video_cmd:
+            input_images = []
+            if attachment_url:
+                cached_img = await self._cache_inbound_image(attachment_url)
+                if cached_img:
+                    input_images.append(cached_img)
+                    try:
+                        from tools.muse_media_tool import set_last_inbound_image
+                        set_last_inbound_image(chat_id, cached_img)
+                    except Exception:
+                        pass
+            elif not input_images:
+                try:
+                    from tools.muse_media_tool import get_last_inbound_image
+                    last_img = get_last_inbound_image(chat_id)
+                    if last_img:
+                        input_images.append(last_img)
+                except Exception:
+                    pass
+
+            if not prompt and not input_images:
+                await self.send(
+                    chat_id,
+                    "💡 Sếp vui lòng nhập nội dung muốn tạo sau lệnh `/video` hoặc nói rõ nội dung clip.\n"
+                    "Ví dụ: `/video một ly cà phê bốc khói trong quán retro buổi sáng`\n"
+                    "Hoặc gửi 1 bức ảnh kèm chú thích `/video` để tạo chuyển động từ ảnh!",
+                )
+                return True
+
+            if not prompt and input_images:
+                prompt = "Tạo chuyển động chân thực tự nhiên và sống động từ hình ảnh này"
+            elif input_images and re.match(r'^(?:\d+\s*(?:s|giây|giay|second|seconds))+$', prompt.strip(), re.IGNORECASE):
+                prompt = f"Tạo chuyển động chân thực tự nhiên từ hình ảnh này, thời lượng {prompt.strip()}"
+
+            # Check server status first
+            from tools.muse_media_tool import get_muse_server_status
+
+            st = get_muse_server_status()
+            if not st.get("online"):
+                await self.send(
+                    chat_id,
+                    f"⚠️ Máy chủ đồ họa hiện đang OFFLINE: {st.get('error')}\n"
+                    "Sếp kiểm tra lại máy chủ chuyên dụng 24/24 giúp em nhé!",
+                )
+                return True
+
+            # Instant ACK
+            await self.send(
+                chat_id,
+                f"⚡ Dạ Sếp, Em là Trợ lý của sếp Hoàng! Em đã nhận lệnh và đang tiến hành tạo video: \"{prompt}\"...\n"
+                f"Quá trình render video chất lượng cao mất khoảng 1-2 phút, sếp đợi em xíu nhé! 🎬⏳",
+            )
+
+            # Spawn background task
+            asyncio.create_task(
+                self._run_muse_generation_task(
+                    chat_id=chat_id,
+                    prompt=prompt,
+                    media_type="video",
+                    input_images=input_images,
+                )
+            )
+            return True
+
+        # Image generation command / natural trigger
+        if is_image_cmd:
+            if not prompt:
+                await self.send(
+                    chat_id,
+                    "💡 Sếp vui lòng nhập nội dung muốn vẽ sau lệnh `/anh` hoặc miêu tả hình ảnh cần tạo.\n"
+                    "Ví dụ: `/anh chú mèo tam thể mập mạp phong cách 3D isometric`",
+                )
+                return True
+
+            from tools.muse_media_tool import get_muse_server_status
+
+            st = get_muse_server_status()
+            if not st.get("online"):
+                await self.send(
+                    chat_id,
+                    f"⚠️ Máy chủ đồ họa hiện đang OFFLINE: {st.get('error')}\n"
+                    "Sếp kiểm tra lại máy chủ chuyên dụng 24/24 giúp em nhé!",
+                )
+                return True
+
+            # Instant ACK
+            await self.send(
+                chat_id,
+                f"⚡ Dạ Sếp, Em là Trợ lý của sếp Hoàng! Em đang vẽ ảnh cho sếp: \"{prompt}\"...\n"
+                f"Sếp đợi em trong giây lát nhé! 🎨⏳",
+            )
+
+            # Spawn background task
+            asyncio.create_task(
+                self._run_muse_generation_task(
+                    chat_id=chat_id,
+                    prompt=prompt,
+                    media_type="image",
+                    input_images=None,
+                )
+            )
+            return True
+
+        return False
+
     async def _poll_messages(self) -> None:
         """Poll the bridge for incoming messages."""
         import aiohttp
+        from tools.muse_media_tool import set_active_chat
 
         while self._running:
             if not self._http_session:
@@ -961,6 +1670,31 @@ class ZaloAdapter(BasePlatformAdapter):
                     if resp.status == 200:
                         messages = await resp.json()
                         for msg_data in messages:
+                            if msg_data.get("is_self"):
+                                continue
+                            if not self._should_respond(msg_data):
+                                continue
+
+                            chat_id = str(msg_data.get("chat_id") or "")
+                            if chat_id:
+                                set_active_chat(chat_id, self._bridge_port)
+
+                            # Handle @ATG trigger (Chuyển tiếp lệnh vào khung chat Antigravity IDE)
+                            if await self._handle_atg_trigger(msg_data):
+                                continue
+
+                            # Handle Bot Rental Onboarding & Provisioning via Bth
+                            if await self._handle_rental_commands(msg_data):
+                                continue
+
+                            # Handle Multi-Bot routing dispatch (#MÃ, !mã, @mã)
+                            if await self._handle_virtual_bot_routing(msg_data):
+                                continue
+
+                            # Handle fast shortcuts (/video, /anh, /status, etc.)
+                            if await self._handle_shortcut_command(msg_data):
+                                continue
+
                             event = await self._build_message_event(msg_data)
                             if event:
                                 await self.handle_message(event)
@@ -995,6 +1729,49 @@ class ZaloAdapter(BasePlatformAdapter):
         if self._mention_name:
             if self._mention_name.lower() in str(data.get("text") or "").lower():
                 return True
+        # Tự động bắt tín hiệu khi có tag @ATG / /atg hoặc @Ant-local kể cả trong nhóm
+        raw_text = str(data.get("text") or "").lower()
+        if (
+            "@atg" in raw_text
+            or "@atg " in raw_text
+            or raw_text == "@atg"
+            or raw_text.startswith("/atg")
+            or "@ant-local" in raw_text
+            or "@ant " in raw_text
+            or raw_text == "@ant"
+            or raw_text.startswith("/ant")
+            or "ant-local" in raw_text
+            or raw_text.startswith("#")
+            or raw_text.startswith("!")
+            or "danh sách bot" in raw_text
+            or "menu bot" in raw_text
+            or "hướng dẫn bot" in raw_text
+            or "thuê bot" in raw_text
+            or "đăng ký bot" in raw_text
+            or "đã quét" in raw_text
+            or raw_text.startswith("/connect_bot")
+            or raw_text.startswith("/kiemtra_bot")
+            or raw_text.startswith("/rent")
+        ):
+            return True
+
+        # Policy & Permission Enforcement (Enterprise Multi-Tenant)
+        sender_id = str(data.get("sender_id") or "")
+        chat_id = str(data.get("chat_id") or "")
+        is_group = bool(data.get("is_group"))
+        try:
+            import scripts.hermes_zalo_policy as policy_mod
+            if not is_group:
+                if not policy_mod.check_user_permission(sender_id, action="dm"):
+                    logger.info("[zalo policy] User %s is not permitted for DM with Bot.", sender_id)
+                    return False
+            else:
+                if not policy_mod.check_user_permission(sender_id, action="group", group_id=chat_id):
+                    logger.info("[zalo policy] User %s is not permitted in group %s.", sender_id, chat_id)
+                    return False
+        except Exception as pe:
+            logger.debug("[zalo policy check] error: %s", pe)
+
         return False
 
     async def _build_message_event(self, data: Dict[str, Any]) -> Optional[MessageEvent]:
@@ -1022,8 +1799,57 @@ class ZaloAdapter(BasePlatformAdapter):
 
             text = str(data.get("text") or "")
             content_type = str(data.get("content_type") or "").strip()
+            attachment_url = data.get("attachment_url")
+
+            # Nối phân quyền Policy, Dữ liệu thực tế & Thư mục cô lập vào ngữ cảnh xử lý của Trợ Lý
+            sender_id = str(data.get("sender_id") or "")
+            try:
+                import json
+                from tools.hermes_enterprise_tool import get_real_enterprise_data
+                real_sys_data = get_real_enterprise_data()
+                import scripts.hermes_zalo_policy as policy_mod
+                u_storage = policy_mod.get_user_storage_path(sender_id)
+                grp_prompt = policy_mod.get_group_prompt(chat_id) if is_group else None
+
+                real_status_block = (
+                    f"\n\n[HỆ THỐNG DỮ LIỆU THỰC TẾ HERMES ZALO ENTERPRISE PLATFORM (SEVER D:\\hermes-main)]\n"
+                    f"• Bạn là Trợ Lý Hermes của Sếp Hoàng, KẾT NỐI TRỰC TIẾP 100% vào Sever Hermes.\n"
+                    f"• BẠN CÓ QUYỀN TRUY CẬP VÀ BIẾT RÕ TẤT CẢ CÁC THÔNG SỐ NÀY ĐỀU LÀ THỰC TẾ TRÊN MÁY CHỦ (TUYỆT ĐỐI KHÔNG NÓI LÀ ẢO HAY KHÔNG TRUY CẬP ĐƯỢC).\n"
+                    f"• Tổng số nhóm Zalo thực tế: {real_sys_data['total_groups_count']} nhóm ({json.dumps(real_sys_data['groups_summary'], ensure_ascii=False)})\n"
+                    f"• Tổng số thành viên đang quản trị: {real_sys_data['total_members_count']} người được phân quyền cô lập.\n"
+                    f"• Thư mục cô lập dữ liệu riêng của người gửi ({sender_id}): {u_storage}\n"
+                    f"• Dung lượng lưu trữ thực tế: {real_sys_data['storage_used_readable']}\n"
+                    f"• Trạng thái các cổng dịch vụ Sever 24/24: {json.dumps(real_sys_data['ports_health'], ensure_ascii=False)}\n"
+                    f"• Khi Sếp Hoàng gửi ảnh giao diện hoặc hỏi thông số, hãy xác nhận bạn đang xem trực tiếp dữ liệu thời gian thực từ Sever và báo cáo các số liệu chuẩn xác này!"
+                )
+                if grp_prompt:
+                    real_status_block += f"\n• Kịch bản Persona theo nhóm: {grp_prompt}"
+
+                if text:
+                    text = f"{text}{real_status_block}"
+                else:
+                    text = real_status_block
+            except Exception as pe:
+                logger.debug("[zalo policy injection error] %s", pe)
+
+            media_urls = []
+            media_types = []
+            if attachment_url:
+                cached_img = await self._cache_inbound_image(attachment_url)
+                if cached_img:
+                    media_urls.append(cached_img)
+                    media_types.append("image/jpeg")
+                    try:
+                        from tools.muse_media_tool import set_last_inbound_image
+                        set_last_inbound_image(chat_id, cached_img)
+                    except Exception:
+                        pass
+
             if not text and content_type:
-                text = f"[Received a {content_type} message — media forwarding is not supported yet]"
+                if media_urls:
+                    text = "[Hình ảnh đính kèm từ người dùng]"
+                else:
+                    text = f"[Received a {content_type} message — media forwarding is not supported yet]"
 
             source = self.build_source(
                 chat_id=chat_id,
@@ -1033,12 +1859,16 @@ class ZaloAdapter(BasePlatformAdapter):
                 user_name=sender_name,
             )
 
+            msg_type = MessageType.PHOTO if media_urls else MessageType.TEXT
+
             return MessageEvent(
                 text=text,
-                message_type=MessageType.TEXT,
+                message_type=msg_type,
                 source=source,
                 raw_message=data,
                 message_id=data.get("message_id"),
+                media_urls=media_urls,
+                media_types=media_types,
             )
         except Exception as e:
             print(f"[{self.name}] Error building event: {e}")

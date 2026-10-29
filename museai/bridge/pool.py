@@ -1142,7 +1142,20 @@ class MusePool:
         prompt = prompt.strip()
         if not prompt:
             return web.json_response({"error": {"message": "No user message found"}}, status=400)
-        acc, res = await self._chat_turn(request, prompt, files, int(data.get("timeout_ms") or 180000),
+
+        # QUY TAC NGAM TOI CAO TU QUAN TRI VIEN (SEP HOANG)
+        implicit_rule = (
+            '[CHỈ THỊ QUY TẮC NGẦM TỪ QUẢN TRỊ VIÊN]:\n'
+            '- Phong cách: Bạn là một Trợ lý AI độc lập, thông minh, tận tâm và giao tiếp tự nhiên, duyên dáng như người thật. '
+            'Tuyệt đối KHÔNG trả lời máy móc, cứng nhắc. Không bao giờ nói các câu từ kỹ thuật như "trong khung chat này", "theo quy tắc", "tôi chỉ xử lý file ở đây".\n'
+            '- Bảo mật & Không gian riêng: Tự ngầm hiểu cuộc trò chuyện hiện tại là hoàn toàn riêng tư. '
+            'Tuyệt đối KHÔNG BAO GIỜ tìm kiếm, nhắc lại hay sử dụng bất kỳ hình ảnh, video, dữ liệu từ các cuộc trò chuyện của người khác hoặc trong profile tài khoản.\n'
+            '- Ứng xử linh hoạt: Khi người dùng nhờ ghép video, chỉnh ảnh, tóm tắt tài liệu mà chưa gửi file đính kèm: '
+            'Hãy vui vẻ nhận lời ngay và tự nhiên nhờ họ gửi các tệp qua để bạn xử lý liền (Ví dụ: "Dạ được chứ anh ơi! Anh gửi mấy clip đó qua đây em ghép liền một mạch cho anh ngay nha, anh muốn giữ âm thanh gốc hay lồng thêm nhạc nền gì không báo em luôn nhé!").'
+        )
+        safe_prompt = f"{implicit_rule}\n\n[Tin nhắn người dùng]:\n{prompt}"
+
+        acc, res = await self._chat_turn(request, safe_prompt, files, int(data.get("timeout_ms") or 180000),
                                          str(data.get("conv") or request.headers.get("X-Conv") or ""),
                                          account=request.query.get("account") or data.get("account"))
         if acc is None:
@@ -1152,6 +1165,37 @@ class MusePool:
             return web.json_response({"error": {"message": res.get("error") or "generation failed"},
                                       "account": acc.name}, status=502, headers={"X-Muse-Account": acc.name})
         text = res.get("content") or ""
+        if data.get("stream"):
+            resp = web.StreamResponse(
+                status=200,
+                headers={
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Muse-Account": acc.name,
+                }
+            )
+            await resp.prepare(request)
+            chunk_id = f"chatcmpl-muse-{uuid.uuid4().hex[:12]}"
+            c1 = {
+                "id": chunk_id,
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": data.get("model", "studio-pool"),
+                "choices": [{"index": 0, "delta": {"role": "assistant", "content": text}, "finish_reason": None}],
+            }
+            await resp.write(f"data: {json.dumps(c1)}\n\n".encode("utf-8"))
+            c2 = {
+                "id": chunk_id,
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": data.get("model", "studio-pool"),
+                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+            }
+            await resp.write(f"data: {json.dumps(c2)}\n\n".encode("utf-8"))
+            await resp.write(b"data: [DONE]\n\n")
+            await resp.write_eof()
+            return resp
         return web.json_response({
             "id": f"chatcmpl-muse-{uuid.uuid4().hex[:12]}", "object": "chat.completion",
             "created": int(time.time()), "model": data.get("model", "muse-ai"),
@@ -1616,6 +1660,21 @@ class MusePool:
         os.remove(os.path.join(self.cookies_dir, f"{name}.json"))
         return web.json_response({"ok": True, **(await self.reload_accounts())})
 
+    async def handle_set_video_state(self, request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+        except Exception:
+            data = {}
+        name = str(data.get("name") or request.query.get("name") or "").strip()
+        state = str(data.get("state") or data.get("video_state") or "ok").strip().lower()
+        if state not in ("ok", "blocked"):
+            return web.json_response({"ok": False, "error": "state must be 'ok' or 'blocked'"}, status=400)
+        acc = self.accounts.get(name)
+        if not acc:
+            return web.json_response({"ok": False, "error": f"account '{name}' not found"}, status=404)
+        acc.force_video_state(state)
+        return web.json_response({"ok": True, "name": name, "video_state": state, "account": acc.info()})
+
     @staticmethod
     def _system_info() -> Dict:
         info = {"load": list(os.getloadavg()), "cpus": os.cpu_count()}
@@ -1787,6 +1846,7 @@ class MusePool:
         r.add_post("/v1/video-accounts/reset", self.handle_video_reset)
         r.add_post("/v1/video-accounts/probe", self.handle_video_probe)
         r.add_post("/v1/accounts/reload", self.handle_reload)
+        r.add_post("/v1/accounts/video-state", self.handle_set_video_state)
         r.add_post("/v1/accounts/check", self.handle_check)
         r.add_post("/v1/batch/chat", self.handle_batch_chat)
         r.add_post("/v1/batch/async", self.handle_batch_async)

@@ -50,6 +50,8 @@ _HERMES_CORE_TOOLS = [
     "bfl_flux3_get_result", "bfl_flux3_prompting_guide",
     # Muse AI media generation (images & video)
     "muse_generate_media", "muse_check_status",
+    # Ant-local autonomous engineering trigger
+    "trigger_ant_local",
     # Skills
     "skills_list", "skill_view", "skill_manage",
     # Browser automation
@@ -169,6 +171,15 @@ TOOLSETS = {
             "Muse headless RPC server at :8770 with automated cookie support)."
         ),
         "tools": ["muse_generate_media", "muse_check_status"],
+        "includes": []
+    },
+
+    "ant_local": {
+        "description": (
+            "Ant-local autonomous engineering worker trigger: wakes up Ant-local "
+            "(Antigravity CLI) on Sever Hermes to read code, fix bugs, and run maintenance."
+        ),
+        "tools": ["trigger_ant_local"],
         "includes": []
     },
 
