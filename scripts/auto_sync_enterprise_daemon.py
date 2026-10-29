@@ -23,9 +23,10 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-ROOT_DIR = Path("D:/hermes-main")
-SCRIPTS_DIR = ROOT_DIR / "hermes-main" / "scripts"
-STORAGE_DIR = ROOT_DIR / "storage"
+ROOT_DIR = Path("D:/hermes-main/hermes-main")
+BASE_DIR = Path("D:/hermes-main")
+SCRIPTS_DIR = ROOT_DIR / "scripts"
+STORAGE_DIR = BASE_DIR / "storage"
 POLICY_PATH = STORAGE_DIR / "policy.json"
 POOL_ACCOUNTS_PATH = STORAGE_DIR / "pool_accounts.json"
 ASSISTANTS_PATH = STORAGE_DIR / "assistants.json"
@@ -133,7 +134,11 @@ def sync_pool_accounts() -> bool:
             "avatar": f"https://api.dicebear.com/7.x/bottts/svg?seed={name}"
         }
 
-        if not prev or prev.get("status") != status or prev.get("video_state") != video_state or prev.get("done") != done:
+        if (not prev or prev.get("status") != status 
+            or prev.get("video_state") != video_state 
+            or prev.get("done") != done
+            or prev.get("reset_label") != reset_label
+            or prev.get("reset_time_str") != reset_time_str):
             has_change = True
 
         new_accounts_list.append(acc_dict)

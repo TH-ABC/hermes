@@ -1470,11 +1470,8 @@ def build_app():
           const parsed = JSON.parse(storedFleet);
           if (Array.isArray(parsed) && parsed.length > 0) ASSISTANTS_FLEET = parsed;
         }}
-        const storedPool = localStorage.getItem('hermes_pool_accounts');
-        if (storedPool) {{
-          const parsedP = JSON.parse(storedPool);
-          if (Array.isArray(parsedP) && parsedP.length > 0) POOL_ACCOUNTS = parsedP;
-        }}
+        // Xóa cache cũ để luôn dùng dữ liệu chu kỳ đặt lại chuẩn xác từ Sever
+        localStorage.removeItem('hermes_pool_accounts');
         const storedActive = localStorage.getItem('hermes_active_assistant_id');
         if (storedActive) ACTIVE_ASSISTANT_ID = storedActive;
         const storedTenants = localStorage.getItem('hermes_tenants_data');
@@ -2745,6 +2742,19 @@ def build_app():
       }});
     }}, 60000);
 
+    async function loadLivePoolAccounts() {{
+      try {{
+        const resp = await fetch('/api/pool');
+        if (resp.ok) {{
+          const data = await resp.json();
+          if (data && Array.isArray(data.accounts) && data.accounts.length > 0) {{
+            POOL_ACCOUNTS = data.accounts;
+            renderPoolAccounts();
+          }}
+        }}
+      }} catch (e) {{}}
+    }}
+
     // Init
     window.addEventListener('DOMContentLoaded', () => {{
       loadFleetFromStorage();
@@ -2755,6 +2765,8 @@ def build_app():
       renderOverviewCards();
       renderRentalPlatform();
       lucide.createIcons();
+      loadLivePoolAccounts();
+      setInterval(loadLivePoolAccounts, 30000);
     }});
   </script>
 </body>
