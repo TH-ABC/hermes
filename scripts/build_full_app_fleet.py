@@ -1538,12 +1538,8 @@ def build_app():
     // Load from LocalStorage if user previously added assistants or cookies
     function loadFleetFromStorage() {{
       try {{
-        const storedFleet = localStorage.getItem('hermes_fleet_assistants');
-        if (storedFleet) {{
-          const parsed = JSON.parse(storedFleet);
-          if (Array.isArray(parsed) && parsed.length > 0) ASSISTANTS_FLEET = parsed;
-        }}
-        // Xóa cache cũ để luôn dùng dữ liệu chu kỳ đặt lại chuẩn xác từ Sever
+        // Luon lam sach cache cu de lay du lieu dong bo chuan xac tu Sever
+        localStorage.removeItem('hermes_fleet_assistants');
         localStorage.removeItem('hermes_pool_accounts');
         const storedActive = localStorage.getItem('hermes_active_assistant_id');
         if (storedActive) ACTIVE_ASSISTANT_ID = storedActive;
