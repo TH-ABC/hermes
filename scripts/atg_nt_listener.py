@@ -186,69 +186,16 @@ def process_nt_task(msg: dict):
         except Exception as ve:
             log_msg(f"Lỗi chuyển lệnh sang VPS: {ve}")
 
-    # 3. Xử lý tác vụ tổng quát cho cụm NT (TỰ ĐỘNG THỰC THI 100% VỚI AGY.EXE)
+    # 3. Tiếp nhận chỉ thị và chuyển thẳng vào Khung Chat Antigravity IDE (KHÔNG chạy ngầm agy.exe song song)
     reply_msg = (
         f"🛠️ [@ATG - Kỹ Sư Trưởng ATG-NT]\n"
         f"Dạ Sếp, Em là Trợ lý của sếp Hoàng.\n\n"
         f"Em đã nhận chỉ thị cho Cụm ATG-NT: \"{clean_text}\"\n"
-        f"⚡ Đang tiến hành thực thi trực tiếp trên hệ thống mã nguồn, kết quả nghiệm thu sẽ được báo cáo ngay sau khi hoàn tất ạ!"
+        f"⚡ Đã chuyển trực tiếp vào khung chat Antigravity IDE để xử lý và báo cáo ngay tại đây ạ!"
     )
     send_to_zalo(chat_id, reply_msg)
-    log_msg(f"✅ Đã trả lời Zalo cho {chat_id} | Nhiệm vụ: {clean_text[:40]}")
-
-    def _execute_async():
-        log_msg(f"🚀 [ATG-NT WORKER] Bắt đầu kích hoạt agy.exe xử lý tác vụ: {clean_text[:60]}")
-        work_dir = Path(r"D:\Ver24-20260907T123521Z-1-001")
-        if not work_dir.exists():
-            work_dir = Path(r"D:\hermes-main")
-
-        full_prompt = (
-            "BẠN LÀ KỸ SƯ TRƯỞNG ATG-NT.\n"
-            f"Chỉ thị của Sếp Hoàng từ Zalo: \"{clean_text}\"\n\n"
-            "Nhiệm vụ của bạn:\n"
-            "1. Kiểm tra mã nguồn liên quan và thực hiện chính xác chỉ thị của Sếp.\n"
-            "2. Trực tiếp sửa đổi code / cấu hình nếu cần.\n"
-            "3. Báo cáo lại kết quả nghiệm thu rõ ràng, súc tích, lịch sự.\n"
-            "QUY TẮC BẮT BUỘC: Luôn xưng 'Em là Trợ lý của sếp Hoàng'."
-        )
-        cmd = [
-            str(AGY_BIN),
-            "--dangerously-skip-permissions",
-            "--print-timeout", "0",
-            "-p", full_prompt,
-        ]
-        try:
-            proc = subprocess.run(
-                cmd,
-                cwd=str(work_dir),
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=600,
-            )
-            out = proc.stdout.strip()
-            if not out and proc.stderr:
-                out = f"⚠️ Cảnh báo thực thi: {proc.stderr[:300]}"
-            if not out:
-                out = "Dạ Sếp, em đã kiểm tra và hoàn tất tác vụ theo chỉ thị của Sếp ạ."
-
-            # Báo cáo nghiệm thu về Zalo
-            res_msg = (
-                f"🛠️ [@ATG - Báo Cáo Nghiệm Thu ATG-NT]\n"
-                f"Dạ Sếp, Em là Trợ lý của sếp Hoàng.\n\n"
-                f"📋 Chỉ thị: \"{clean_text[:60]}\"\n\n"
-                f"📄 Kết quả thực hiện:\n{out[:3000]}"
-            )
-            send_to_zalo(chat_id, res_msg)
-            log_msg(f"✅ Đã báo cáo nghiệm thu về Zalo cho {chat_id}")
-        except Exception as e:
-            log_msg(f"❌ Lỗi thực thi agy: {e}")
-            send_to_zalo(chat_id, f"❌ [ATG-NT] Lỗi trong quá trình thực thi: {e}")
-        finally:
-            mark_completed(item_id)
-
-    threading.Thread(target=_execute_async, daemon=True).start()
+    log_msg(f"✅ Đã chuyển lệnh vào khung chat IDE cho {chat_id} | Nhiệm vụ: {clean_text[:40]}")
+    mark_completed(item_id)
 
 
 def main():
