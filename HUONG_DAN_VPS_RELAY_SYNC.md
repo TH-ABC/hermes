@@ -160,3 +160,33 @@ hoặc
 | **GET** | `http://127.0.0.1:8998/api/vps/poll?vps_id=...` | VPS gọi định kỳ để lấy lệnh chờ |
 | **POST** | `http://127.0.0.1:8998/api/vps/result` | VPS gửi kết quả thực thi về |
 | **POST** | `http://127.0.0.1:8998/api/vps/dispatch` | Đẩy một lệnh mới vào hàng đợi VPS (kèm tính năng Ping trực tiếp nếu có `target_url`) |
+
+---
+
+## 📢 6. BẢN TIN THÔNG BÁO CẬP NHẬT CHO ĐỘI NGŨ / MÁY CHỦ VPS
+
+> **Sếp hoặc Kỹ sư VPS chỉ cần copy đoạn thông báo bên dưới gửi cho bên quản trị VPS:**
+
+```text
+📢 [THÔNG BÁO CẬP NHẬT HỆ THỐNG VPS RELAY WORKER]
+Gửi đội ngũ kỹ thuật VPS / Quản trị viên máy chủ:
+
+Hệ thống đã triển khai giao thức kết nối siêu nhẹ VPS Relay 1 Luồng (Zero-Hermes).
+Vui lòng thực hiện cập nhật theo các bước sau:
+
+1️⃣ Kéo mã nguồn mới nhất:
+   cd <thu_muc_hermes>
+   git pull origin main
+
+2️⃣ Hoặc copy riêng file worker duy nhất:
+   scripts/vps_relay_worker.py
+
+3️⃣ Khởi động worker trên VPS (Windows hoặc Linux):
+   python scripts/vps_relay_worker.py --server http://<IP_HOAC_DOMAIN_HERMES>:8998 --vps-id vps-main --interval 60
+
+⚡ Điểm mới trong bản cập nhật này:
+- Tự động quét nhận lệnh từ Sever Hermes mỗi 60 giây.
+- Hỗ trợ Hermes ping trực tiếp qua cổng 8995 để thực thi tức thì (<1 giây).
+- Tự động báo cáo kết quả thực thi lệnh về Zalo cho Sếp Hoàng.
+- Tiêu thụ cực nhẹ: ~10MB RAM, 0% CPU, 0 token khi đứng chờ.
+```
