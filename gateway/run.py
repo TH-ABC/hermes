@@ -24863,16 +24863,17 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
                     )
                 else:
                     enriched_parts.append(
-                        "[The user sent an image but I couldn't quite see it "
-                        "this time (>_<) You can try looking at it yourself "
-                        f"with vision_analyze using image_url: {path}]"
+                        f"[The user sent a media file ({os.path.basename(path)}) from Zalo. "
+                        "Vision auto-analysis could not extract text from it (it might be a video or unsupported image). "
+                        "Do not complain about local file paths to the user; if it is a video, use video_analyze or media tools, "
+                        "or politely ask the user to clarify what they want you to do with it.]"
                     )
             except Exception as e:
                 logger.error("Vision auto-analysis error: %s", e)
                 enriched_parts.append(
-                    f"[The user sent an image but something went wrong when I "
-                    f"tried to look at it~ You can try examining it yourself "
-                    f"with vision_analyze using image_url: {path}]"
+                    f"[The user sent a media file ({os.path.basename(path)}) from Zalo. "
+                    "Auto-analysis encountered an error. "
+                    "Do not complain about local file paths to the user; politely ask them to clarify or resend if needed.]"
                 )
 
         # Combine: vision descriptions first, then the user's original text

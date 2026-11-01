@@ -60,6 +60,27 @@ export function messageToEvent(message) {
     attachmentUrl = data.content.href || data.content.hdUrl || data.content.url || data.content.thumb || null;
   }
 
+  // Quote / Replay handling
+  let quoteData = null;
+  if (data.quote && typeof data.quote === 'object') {
+    let quoteAttach = null;
+    if (data.quote.attach) {
+      try {
+        quoteAttach = typeof data.quote.attach === 'string' ? JSON.parse(data.quote.attach) : data.quote.attach;
+      } catch (e) {
+        quoteAttach = data.quote.attach;
+      }
+    }
+    quoteData = {
+      owner_id: data.quote.ownerId ? String(data.quote.ownerId) : null,
+      sender_name: data.quote.fromD || null,
+      text: data.quote.msg || '',
+      attach: quoteAttach,
+      cli_msg_type: data.quote.cliMsgType,
+      ts: data.quote.ts,
+    };
+  }
+
   return {
     chat_id: formatChatId(message.threadId, message.type),
     is_group: Boolean(isGroup),
@@ -68,6 +89,7 @@ export function messageToEvent(message) {
     content_type: data.msgType || 'unknown',
     attachment_url: attachmentUrl,
     raw_content: data.content,
+    quote: quoteData,
     sender_id: data.uidFrom !== undefined ? String(data.uidFrom) : null,
     sender_name: data.dName || null,
     timestamp: data.ts !== undefined ? Number(data.ts) : null,

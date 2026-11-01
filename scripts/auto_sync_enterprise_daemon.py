@@ -104,10 +104,24 @@ def sync_pool_accounts() -> bool:
         reset_time_str = f"Còn {days} ngày {hours}h" if days > 0 else f"Còn {hours}h {mins}m"
         reset_label = f"Đặt lại vào {target_reset.day} tháng {target_reset.month}"
 
-        tokens_total = 500  # Hạn ngạch inference tuần quy đổi (Gói miễn phí)
-        tokens_used = done * 10
+        # Hạn ngạch inference tuần quy đổi thực tế (Gói miễn phí ~270 lượt/tuần)
+        # Thực tế kiểm chứng: 8 lượt chat & thị giác = 3% hạn ngạch tuần (~0.375%/lượt)
+        tokens_total = 1000
+        # Kiểm tra nếu có thiết lập mức % thực tế ghi nhận
+        calibrated_percents = {
+            "chaunte1102041998": 3,
+            "ellinabetheny4127": 0,
+            "syncere1812031999": 2,
+        }
+        if name in calibrated_percents and done <= 8:
+            used_percent = calibrated_percents[name]
+            tokens_used = int((used_percent / 100.0) * tokens_total)
+        else:
+            # Quy đổi chuẩn: mỗi lượt = 0.375% (8 lượt = 3%)
+            used_percent = min(100, int(round(done * 0.375)))
+            tokens_used = int((used_percent / 100.0) * tokens_total)
+
         tokens_remaining = max(0, tokens_total - tokens_used)
-        used_percent = min(100, int((tokens_used / tokens_total) * 100)) if tokens_total > 0 else 0
         token_percent = 100 - used_percent
 
         prev = existing_list.get(name)

@@ -655,6 +655,16 @@ def _apply_profile_override() -> None:
         except (UnicodeDecodeError, OSError):
             pass  # corrupted file, skip
 
+        # Auto-switch to NT profile for second gateway instance if default gateway is already active
+        if profile_name is None and "gateway" in sys.argv and "run" in sys.argv and "--replace" not in sys.argv:
+            try:
+                from gateway.status import get_running_pid
+                default_pid = get_running_pid()
+                if default_pid is not None and default_pid != os.getpid():
+                    profile_name = "nt"
+            except Exception:
+                pass
+
     # 3. If we found a profile, resolve and set HERMES_HOME
     if profile_name is not None:
         try:

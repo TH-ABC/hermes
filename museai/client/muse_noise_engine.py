@@ -456,15 +456,28 @@ class MuseNoiseClient:
                 raise RuntimeError(f"Failed to upload {filename} to {remote_rel_path}: {st} {res.decode('utf-8', 'ignore')}")
         return remote_rel_path
 
+    def _generate_standard_media_filename(self, ext: str) -> str:
+        """Quy chuẩn đặt tên: ddmmyyyy-video01, ddmmyyyy-photo01... Tuyệt đối không dùng tiền tố lạ hay ngẫu nhiên."""
+        from datetime import datetime
+        date_str = datetime.now().strftime("%d%m%Y")
+        is_video = ext.lower() in (".mp4", ".mov", ".webm", ".mkv", ".avi", ".3gp")
+        prefix = "video" if is_video else "photo"
+        index = 1
+        while True:
+            candidate = f"{date_str}-{prefix}{index:02d}{ext}"
+            if not os.path.exists(os.path.join(self.media_dir, candidate)):
+                return candidate
+            index += 1
+
     def download_file(self, remote_path: str, save_filename: Optional[str] = None) -> Tuple[str, bytes]:
-        """Downloads file from VM via GET /fs/raw/{remote_path} and saves locally."""
+        """Downloads file from VM via GET /fs/raw/{remote_path} and saves locally with standard ddmmyyyy naming."""
         clean_path = remote_path.replace("sandbox://", "").lstrip("/")
         st, data = self.request("GET", f"/fs/raw/{clean_path}")
         if st != 200:
             raise RuntimeError(f"Failed to download {clean_path} (status {st})")
         if not save_filename:
             ext = os.path.splitext(clean_path)[-1] or ".bin"
-            save_filename = f"muse_{uuid.uuid4().hex[:8]}_0{ext}"
+            save_filename = self._generate_standard_media_filename(ext)
         local_path = os.path.join(self.media_dir, save_filename)
         with open(local_path, "wb") as f:
             f.write(data)
@@ -601,6 +614,7 @@ class MuseNoiseClient:
         events = hj.get("result", {}).get("chat_events", [])
 
         assistant_text = ""
+        texts = []
         media_urls = []
         local_files = []
 
@@ -611,26 +625,76 @@ class MuseNoiseClient:
             p = ev.get("payload", {})
             if ename == "message.assistant":
                 txt = ev.get("display_text") or p.get("content") or ""
-                if txt:
-                    assistant_text = txt
+                # Convert quick-reply widget options to clean bullet points
+                widgets = p.get("widgets") or []
+                for w in widgets:
+                    wdata = w.get("data") or {}
+                    opts = wdata.get("options") or []
+                    if opts:
+                        opt_str = "\n".join(f"  • {o}" for o in opts)
+                        txt = re.sub(
+                            r'\[\[hatch_widget:[^\]]+\]\]',
+                            f"\n👉 Gợi ý lựa chọn tiếp theo:\n{opt_str}",
+                            txt
+                        )
+                # Strip any leftover technical widget codes
+                txt = re.sub(r'\[\[hatch_widget:[^\]]+\]\]', '', txt).strip()
+                if txt and txt not in texts:
+                    texts.append(txt)
             elif ename == "delta.presentation":
                 pdata = p.get("data", {})
                 # Images
                 for img in pdata.get("images", []):
                     rpath = img.get("path")
                     if rpath:
-                        local_path, _ = self.download_file(rpath)
-                        save_name = os.path.basename(local_path)
-                        media_urls.append(f"/media/{save_name}")
-                        local_files.append(local_path)
+                        try:
+                            local_path, _ = self.download_file(rpath)
+                            save_name = os.path.basename(local_path)
+                            media_urls.append(f"/media/{save_name}")
+                            if local_path not in local_files:
+                                local_files.append(local_path)
+                        except Exception:
+                            pass
                 # Videos
                 for vid in pdata.get("videos", []):
                     rpath = vid.get("path")
                     if rpath:
-                        local_path, _ = self.download_file(rpath)
-                        save_name = os.path.basename(local_path)
-                        media_urls.append(f"/media/{save_name}")
-                        local_files.append(local_path)
+                        try:
+                            local_path, _ = self.download_file(rpath)
+                            save_name = os.path.basename(local_path)
+                            media_urls.append(f"/media/{save_name}")
+                            if local_path not in local_files:
+                                local_files.append(local_path)
+                            try:
+                                from tools.muse_media_tool import send_media_to_active_chat
+                                label = vid.get("label") or "Video vừa hoàn tất"
+                                send_media_to_active_chat(local_path, caption=f"🎬 {label}")
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+
+                # Fallback text path extraction
+                for target_dict in (pdata, p):
+                    fb = target_dict.get("fallback_text", "")
+                    if "sandbox://" in fb or "workspace/" in fb:
+                        matches = re.findall(r'(?:sandbox://|workspace/)[^\s\)\"\']+\.(?:mp4|webm|mov|mkv|png|jpg|jpeg|webp)', fb, re.IGNORECASE)
+                        for m in matches:
+                            try:
+                                local_path, _ = self.download_file(m)
+                                if local_path not in local_files:
+                                    local_files.append(local_path)
+                                    save_name = os.path.basename(local_path)
+                                    media_urls.append(f"/media/{save_name}")
+                                    try:
+                                        from tools.muse_media_tool import send_media_to_active_chat
+                                        send_media_to_active_chat(local_path, caption="🎬 Video hoàn tất gửi Sếp:")
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
+
+        assistant_text = "\n\n".join(texts)
 
         duration_ms = round((time.time() - t0) * 1000)
         return {

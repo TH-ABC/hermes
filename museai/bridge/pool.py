@@ -1046,8 +1046,11 @@ class MusePool:
             last = None
             for _ in range(tries):
                 if not acc:
-                    acc = sticky if (sticky and sticky.available and not (video and sticky.no_video)) \
-                        else await self._wait_pick(video=video)
+                    # Ưu tiên tuyệt đối tài khoản sticky để giữ nguyên session_id và context của chat
+                    if sticky and (sticky.available or sticky.status == "ready"):
+                        acc = sticky
+                    else:
+                        acc = await self._wait_pick(video=video)
                 if not acc:
                     if last:  # every account we had was tried and refused video
                         res["error"] = "Không còn tài khoản nào tạo được video (đã thử hết danh sách)."
@@ -1110,7 +1113,7 @@ class MusePool:
         if acc is None:
             return res  # an error response
         self._account_result("chat", acc, prompt, res)
-        out = {k: res.get(k) for k in ("ok", "content", "media", "duration_ms", "status", "account",
+        out = {k: res.get(k) for k in ("ok", "content", "media", "local_paths", "duration_ms", "status", "account",
                                          "files_attached", "error") if res.get(k) is not None}
         out.setdefault("content", "")
         out.setdefault("media", [])
@@ -1136,12 +1139,19 @@ class MusePool:
                         prompt += part.get("text", "") + "\n"
                     elif part.get("type") == "image_url":
                         url = (part.get("image_url") or {}).get("url")
-                        if isinstance(url, str) and url.startswith(("data:", "https://")):
+                        if isinstance(url, str):
                             files.append(url)
             break
         prompt = prompt.strip()
         if not prompt:
             return web.json_response({"error": {"message": "No user message found"}}, status=400)
+
+        # Tu dong quet va nap cac tep media (anh, video) cuc bo duoc truyen trong prompt hoac context
+        found_paths = re.findall(r'[A-Za-z]:\\[^ \n\r\t\"\'\)\]]+', prompt)
+        for fp in found_paths:
+            fp_clean = fp.rstrip(".,;:)")
+            if os.path.exists(fp_clean) and fp_clean not in files:
+                files.append(fp_clean)
 
         # QUY TAC NGAM TOI CAO TU QUAN TRI VIEN (SEP HOANG)
         implicit_rule = (
@@ -1149,14 +1159,25 @@ class MusePool:
             '- Phong cách: Bạn là một Trợ lý AI độc lập, thông minh, tận tâm và giao tiếp tự nhiên, duyên dáng như người thật. '
             'Tuyệt đối KHÔNG trả lời máy móc, cứng nhắc. Không bao giờ nói các câu từ kỹ thuật như "trong khung chat này", "theo quy tắc", "tôi chỉ xử lý file ở đây".\n'
             '- Bảo mật & Không gian riêng: Tự ngầm hiểu cuộc trò chuyện hiện tại là hoàn toàn riêng tư. '
-            'Tuyệt đối KHÔNG BAO GIỜ tìm kiếm, nhắc lại hay sử dụng bất kỳ hình ảnh, video, dữ liệu từ các cuộc trò chuyện của người khác hoặc trong profile tài khoản.\n'
+            'Tuyệt đối KHÔNG BAO GIỜ tìm kiếm, nhắc lại hay sử dụng bất kỳ hình ảnh, video, dữ liệu từ các cuộc trò chuyện của người khác hoặc trong profile tài khoản (Ví dụ: tuyệt đối KHÔNG bao giờ nhắc lại video con gà hay các clip cũ).\n'
+            '- Xử lý Media/Video: Khi người dùng gửi video hoặc ảnh đính kèm mới, bạn ĐÃ NHẬN ĐƯỢC TỆP ĐÓ TRỰC TIẾP RỒI. Hãy làm việc và phản hồi ngay dựa trên tệp vừa gửi (hỏi chi tiết chữ muốn chèn, hiệu ứng, âm thanh/nhạc muốn lồng vào clip mới này).\n'
             '- Ứng xử linh hoạt: Khi người dùng nhờ ghép video, chỉnh ảnh, tóm tắt tài liệu mà chưa gửi file đính kèm: '
             'Hãy vui vẻ nhận lời ngay và tự nhiên nhờ họ gửi các tệp qua để bạn xử lý liền (Ví dụ: "Dạ được chứ anh ơi! Anh gửi mấy clip đó qua đây em ghép liền một mạch cho anh ngay nha, anh muốn giữ âm thanh gốc hay lồng thêm nhạc nền gì không báo em luôn nhé!").'
         )
         safe_prompt = f"{implicit_rule}\n\n[Tin nhắn người dùng]:\n{prompt}"
 
+        # Track conversation ID for continuity across turns
+        conv_id = str(data.get("conv") or request.headers.get("X-Conv") or "").strip()
+        if not conv_id:
+            # Fall back to user message or active chat tracker if available
+            try:
+                from tools.muse_media_tool import _ACTIVE_CHAT_TRACKER
+                conv_id = _ACTIVE_CHAT_TRACKER.get("chat_id") or "zalo_default"
+            except Exception:
+                conv_id = "zalo_default"
+
         acc, res = await self._chat_turn(request, safe_prompt, files, int(data.get("timeout_ms") or 180000),
-                                         str(data.get("conv") or request.headers.get("X-Conv") or ""),
+                                         conv_id,
                                          account=request.query.get("account") or data.get("account"))
         if acc is None:
             return res
@@ -1165,6 +1186,11 @@ class MusePool:
             return web.json_response({"error": {"message": res.get("error") or "generation failed"},
                                       "account": acc.name}, status=502, headers={"X-Muse-Account": acc.name})
         text = res.get("content") or ""
+        local_paths = res.get("local_paths") or []
+        if local_paths:
+            media_directives = "\n".join(f"MEDIA:{lp}" for lp in local_paths)
+            if media_directives:
+                text = f"{text}\n\n{media_directives}" if text else media_directives
         if data.get("stream"):
             resp = web.StreamResponse(
                 status=200,

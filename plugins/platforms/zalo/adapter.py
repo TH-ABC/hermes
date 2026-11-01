@@ -1267,10 +1267,23 @@ class ZaloAdapter(BasePlatformAdapter):
         text = str(msg_data.get("text") or "").strip()
         text_lower = text.lower()
 
-        is_atg = (
-            "@atg" in text_lower
-            or "@atg " in text_lower
-            or text_lower == "@atg"
+        # Phân định routing theo tag: ATG-NT vs ATG-Hermes
+        is_nt = (
+            "@atg-nt" in text_lower
+            or "@nt" in text_lower
+            or "atg-nt" in text_lower
+            or text_lower.startswith("/nt")
+            or text_lower.startswith("@nt")
+        )
+
+        is_hermes = (
+            "@atg-hermesh" in text_lower
+            or "@atg-hermes" in text_lower
+            or "@hermesh" in text_lower
+            or "@hermes" in text_lower
+            or "atg-hermesh" in text_lower
+            or "atg-hermes" in text_lower
+            or "@atg" in text_lower
             or text_lower.startswith("/atg")
             or text_lower.startswith("@atg")
             # Tương thích ngược với tag cũ
@@ -1280,20 +1293,18 @@ class ZaloAdapter(BasePlatformAdapter):
             or text_lower.startswith("/ant")
             or "ant-local" in text_lower
         )
-        if not is_atg:
+
+        if not is_nt and not is_hermes:
             return False
 
-        # Tách nội dung chỉ thị của Sếp
-        clean_text = text
-        for prefix in [
-            "@ATG", "@atg", "/atg",
-            "@Ant-local", "@ant-local", "@ANT-LOCAL", "@ant", "@Ant", "/ant"
-        ]:
-            if prefix in clean_text:
-                clean_text = clean_text.replace(prefix, "").strip()
+        # Tách nội dung chỉ thị của Sếp bằng regex chuẩn không phân biệt hoa thường
+        clean_text = re.sub(r"(?i)@atg[-_]?(hermesh?|nt)?\b", "", text)
+        clean_text = re.sub(r"(?i)@(hermesh?|nt|ant[-_]?local|ant)\b", "", clean_text)
+        clean_text = re.sub(r"(?i)^[/@](atg|ant|hermesh?|nt)\b", "", clean_text)
+        clean_text = re.sub(r"^[-_:\s]+", "", clean_text).strip()
 
         if not clean_text:
-            clean_text = "Sếp yêu cầu kiểm tra hệ thống và trạng thái Sever Hermes."
+            clean_text = "Sếp yêu cầu kiểm tra hệ thống và trạng thái hoạt động."
 
         attachment_url = msg_data.get("attachment_url")
         saved_images = []
@@ -1307,17 +1318,26 @@ class ZaloAdapter(BasePlatformAdapter):
                 except Exception:
                     pass
 
-        # 1. Báo chạy đánh thức [0s] tức thì vào đúng khung chat này cho Sếp
+        # 1. Báo chạy đánh thức [0s] tức thì vào đúng khung chat mà Sếp chỉ thị
+        if is_nt:
+            cluster_target = "ATG-NT"
+            target_routing_label = "Khung chat Kỹ Sư Trưởng [ATG-NT]"
+            queue_file_name = "atg_nt_queue.json"
+        else:
+            cluster_target = "ATG-Hermes"
+            target_routing_label = "Khung chat Kỹ Sư Trưởng [ATG-Hermes] (Sever Hermes)"
+            queue_file_name = "atg_queue.json"
+
         wake_ack = (
-            "🛠️ **[@ATG - Kỹ Sư Trưởng Antigravity]**\n"
+            "🛠️ **[@ATG - Kỹ Sư Trưởng]**\n"
             "Em đã nhận chỉ thị từ Sếp!\n"
             f"📋 **Nhiệm vụ:** {clean_text}\n"
-            "⚡ Em đã chuyển chỉ thị vào khung chat Antigravity để đọc mã nguồn và xử lý trực tiếp trên Sever Hermes. "
-            "Kết quả nghiệm thu sẽ được báo cáo ngay tại đây sau khi hoàn tất ạ!"
+            f"👉 **Định tuyến:** {target_routing_label}\n"
+            "⚡ Đã chuyển trực tiếp vào khung chat để thực thi. Kết quả sẽ được báo cáo ngay tại đây sau khi hoàn tất ạ!"
         )
         await self.send(chat_id, wake_ack)
 
-        # 2. Đưa vào hàng đợi atg_queue.json để Antigravity tại khung chat này nhận và xử lý
+        # 2. Đưa vào hàng đợi tương ứng để khung chat Antigravity chỉ định tiếp nhận và xử lý
         try:
             import sys
             from pathlib import Path
@@ -1330,8 +1350,10 @@ class ZaloAdapter(BasePlatformAdapter):
                 chat_id=chat_id,
                 images=saved_images,
                 sender="Sếp Hoàng",
+                target=cluster_target,
+                queue_filename=queue_file_name
             )
-            logger.info("[%s] Đã đưa chỉ thị @ATG vào hàng đợi thành công!", self.name)
+            logger.info("[%s] Đã đưa chỉ thị [%s] vào hàng đợi %s thành công!", self.name, cluster_target, queue_file_name)
         except Exception as q_err:
             logger.error("[%s] Lỗi enqueue @ATG: %s", self.name, q_err)
 

@@ -16,7 +16,7 @@ import subprocess
 import urllib.request
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from datetime import datetime
+from datetime import datetime, timedelta
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -194,7 +194,6 @@ def execute_ant_local_task_async(task_text: str, image_paths: list = None, chat_
         cmd = [
             str(AGY_BIN),
             "--dangerously-skip-permissions",
-            "--effort", "medium",
             "--print-timeout", "0",
             "-p", full_prompt,
         ]
@@ -242,6 +241,109 @@ def execute_ant_local_task_async(task_text: str, image_paths: list = None, chat_
 
     t = threading.Thread(target=_worker, daemon=True)
     t.start()
+
+
+# =========================================================================
+# VPS RELAY & DISPATCH SYSTEM (Hỗ trợ VPS không cài Hermes)
+# =========================================================================
+VPS_TASKS_FILE = Path("D:/hermes-main/storage/vps_tasks.json")
+VPS_NODES_FILE = Path("D:/hermes-main/storage/vps_nodes.json")
+
+
+def _read_vps_tasks() -> list:
+    if not VPS_TASKS_FILE.exists():
+        return []
+    try:
+        with open(VPS_TASKS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _write_vps_tasks(tasks: list):
+    try:
+        VPS_TASKS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = VPS_TASKS_FILE.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(tasks, f, indent=2, ensure_ascii=False)
+        tmp.replace(VPS_TASKS_FILE)
+    except Exception as e:
+        log_msg(f"Lỗi ghi vps_tasks: {e}")
+
+
+def _read_vps_nodes() -> dict:
+    if not VPS_NODES_FILE.exists():
+        return {}
+    try:
+        with open(VPS_NODES_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _write_vps_nodes(nodes: dict):
+    try:
+        VPS_NODES_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = VPS_NODES_FILE.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(nodes, f, indent=2, ensure_ascii=False)
+        tmp.replace(VPS_NODES_FILE)
+    except Exception as e:
+        log_msg(f"Lỗi ghi vps_nodes: {e}")
+
+
+def update_vps_heartbeat(vps_id: str, ip: str, meta: dict = None):
+    nodes = _read_vps_nodes()
+    node = nodes.get(vps_id, {})
+    node["vps_id"] = vps_id
+    node["last_seen"] = datetime.now().isoformat()
+    node["ip"] = ip
+    if meta:
+        node.update(meta)
+    nodes[vps_id] = node
+    _write_vps_nodes(nodes)
+
+
+def get_next_vps_task(vps_id: str) -> dict | None:
+    tasks = _read_vps_tasks()
+    for task in tasks:
+        if task.get("status") == "pending" and (task.get("vps_id") == vps_id or task.get("vps_id") == "all"):
+            task["status"] = "processing"
+            task["dispatched_at"] = datetime.now().isoformat()
+            _write_vps_tasks(tasks)
+            return task
+    return None
+
+
+def complete_vps_task(task_id: str, result: dict):
+    tasks = _read_vps_tasks()
+    matched_task = None
+    for task in tasks:
+        if task.get("id") == task_id:
+            task["status"] = result.get("status", "completed")
+            task["output"] = result.get("output", "")
+            task["exit_code"] = result.get("exit_code", 0)
+            task["completed_at"] = datetime.now().isoformat()
+            matched_task = task
+            break
+    _write_vps_tasks(tasks)
+
+    # Nếu task có chat_id (xuất phát từ Zalo), tự động báo về Zalo
+    if matched_task and matched_task.get("chat_id"):
+        chat_id = matched_task["chat_id"]
+        cmd = matched_task.get("command", "")
+        out = (matched_task.get("output") or "").strip()
+        status_icon = "✅" if matched_task["status"] in ("completed", "success") else "❌"
+        msg = (
+            f"🛠️ [@ATG - Báo Cáo Nghiệm Thu VPS]\n"
+            f"Dạ Sếp, lệnh thực thi trên VPS đã có kết quả:\n\n"
+            f"📋 Lệnh: `{cmd}`\n"
+            f"{status_icon} Trạng thái: {matched_task['status'].upper()}\n\n"
+            f"📄 Kết quả trả về:\n{out[:2500]}"
+        )
+        send_to_zalo_chat(msg, chat_id=chat_id)
 
 
 class SeverHermesOpsHandler(BaseHTTPRequestHandler):
@@ -304,7 +406,7 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
         if self.path.startswith("/api/pool"):
             try:
                 import urllib.request
-                from datetime import datetime, timedelta
+                # datetime & timedelta imported at module level
                 with urllib.request.urlopen("http://127.0.0.1:8770/v1/accounts", timeout=5) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                     now = datetime.now()
@@ -470,9 +572,133 @@ class SeverHermesOpsHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "File not found"}, 404)
                 return
 
+        # =====================================================================
+        # VPS RELAY API: GET ENDPOINTS
+        # =====================================================================
+        if self.path.startswith("/api/vps/poll"):
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(self.path)
+            qs = parse_qs(parsed.query)
+            vps_id = qs.get("vps_id", ["vps-main"])[0]
+            client_ip = self.client_address[0] if self.client_address else "unknown"
+            update_vps_heartbeat(vps_id, client_ip)
+            task = get_next_vps_task(vps_id)
+            if task:
+                log_msg(f"📡 [VPS-POLL] Cấp lệnh cho {vps_id}: {task.get('command')}")
+                self._send_json({"ok": True, "has_task": True, "task": task})
+            else:
+                self._send_json({"ok": True, "has_task": False, "server_time": datetime.now().isoformat()})
+            return
+
+        if self.path.startswith("/api/vps/status"):
+            nodes = _read_vps_nodes()
+            tasks = _read_vps_tasks()
+            now = datetime.now()
+            node_list = []
+            for vid, node in nodes.items():
+                ls_str = node.get("last_seen")
+                is_online = False
+                seconds_ago = None
+                if ls_str:
+                    try:
+                        ls_dt = datetime.fromisoformat(ls_str)
+                        seconds_ago = int((now - ls_dt).total_seconds())
+                        is_online = seconds_ago < 180
+                    except Exception:
+                        pass
+                node_list.append({
+                    "vps_id": vid,
+                    "ip": node.get("ip"),
+                    "last_seen": ls_str,
+                    "seconds_ago": seconds_ago,
+                    "online": is_online,
+                    "meta": node.get("meta", {})
+                })
+            self._send_json({
+                "ok": True,
+                "vps_count": len(node_list),
+                "nodes": node_list,
+                "pending_tasks": len([t for t in tasks if t.get("status") == "pending"]),
+                "completed_tasks": len([t for t in tasks if t.get("status") in ("completed", "success")])
+            })
+            return
+
         self._send_json({"error": "Endpoint not found"}, 404)
 
     def do_POST(self):
+        # =====================================================================
+        # VPS RELAY API: POST ENDPOINTS
+        # =====================================================================
+        if self.path.startswith("/api/vps/result"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_length)
+            try:
+                payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+                task_id = payload.get("task_id")
+                log_msg(f"📥 [VPS-RESULT] Nhận kết quả task {task_id}: {payload.get('status')}")
+                complete_vps_task(task_id, payload)
+                self._send_json({"ok": True, "task_id": task_id, "saved": True})
+            except Exception as e:
+                log_msg(f"❌ [VPS-RESULT ERROR]: {e}")
+                self._send_json({"ok": False, "error": str(e)}, 400)
+            return
+
+        if self.path.startswith("/api/vps/dispatch"):
+            content_length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(content_length)
+            try:
+                payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+                cmd = payload.get("command", "").strip()
+                vps_id = payload.get("vps_id", "vps-main")
+                chat_id = payload.get("chat_id")
+                target_url = payload.get("target_url")
+
+                if not cmd:
+                    self._send_json({"ok": False, "error": "Thiếu lệnh command"}, 400)
+                    return
+
+                task_id = f"vps_task_{int(time.time()*1000)}"
+                task = {
+                    "id": task_id,
+                    "vps_id": vps_id,
+                    "command": cmd,
+                    "chat_id": chat_id,
+                    "created_at": datetime.now().isoformat(),
+                    "status": "pending",
+                    "type": payload.get("type", "exec")
+                }
+                tasks = _read_vps_tasks()
+                tasks.append(task)
+                _write_vps_tasks(tasks)
+                log_msg(f"⚡ [VPS-DISPATCH] Đã tạo lệnh cho {vps_id}: {cmd} (Task ID: {task_id})")
+
+                direct_ping_ok = False
+                if target_url:
+                    try:
+                        ping_req = urllib.request.Request(
+                            target_url,
+                            data=json.dumps(task).encode("utf-8"),
+                            headers={"Content-Type": "application/json"},
+                            method="POST"
+                        )
+                        with urllib.request.urlopen(ping_req, timeout=3) as resp:
+                            if resp.status == 200:
+                                direct_ping_ok = True
+                                log_msg(f"🚀 [VPS-DIRECT-PING] Ping trực tiếp tới {target_url} thành công!")
+                    except Exception as pe:
+                        log_msg(f"⚠️ [VPS-DIRECT-PING] Ping tới {target_url} không phản hồi: {pe}")
+
+                self._send_json({
+                    "ok": True,
+                    "task_id": task_id,
+                    "queued": True,
+                    "direct_ping": direct_ping_ok
+                })
+            except Exception as e:
+                log_msg(f"❌ [VPS-DISPATCH ERROR]: {e}")
+                self._send_json({"ok": False, "error": str(e)}, 400)
+            return
+
         if self.path.startswith("/api/groups/leave"):
             content_length = int(self.headers.get("Content-Length", 0))
             raw_body = self.rfile.read(content_length)
@@ -840,4 +1066,15 @@ def run_server(port=8999):
 
 
 if __name__ == "__main__":
-    run_server(8999)
+    port = 8999
+    for i, a in enumerate(sys.argv):
+        if a in ("--port", "-p") and i + 1 < len(sys.argv):
+            port = int(sys.argv[i + 1])
+        elif a.isdigit():
+            port = int(a)
+    if "PORT" in os.environ:
+        try:
+            port = int(os.environ["PORT"])
+        except ValueError:
+            pass
+    run_server(port)
